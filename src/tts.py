@@ -13,7 +13,7 @@ _OAI_TTS_URL = "https://api.openai.com/v1/audio/speech"
 _GOOGLE_TTS_URL = "https://texttospeech.googleapis.com/v1/text:synthesize"
 _GOOGLE_VOICES_URL = "https://texttospeech.googleapis.com/v1/voices"
 
-OPENAI_VOICES = ["alloy", "echo", "fissure", "nova", "onyx", "shimmer"]
+OPENAI_VOICES = ["alloy", "echo", "fable", "nova", "onyx", "shimmer"]
 
 _audio_queue: queue.Queue = queue.Queue()
 _worker: threading.Thread | None = None
