@@ -22,7 +22,8 @@ except ImportError:
     sys.exit(1)
 
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
-_POLL_INTERVAL = 0.1  # seconds
+_POLL_INTERVAL = 0.1   # seconds
+_FLUSH_AFTER = 2.0     # flush partial sentence after N seconds of no new text
 
 # UI strings that appear in Claude Desktop chrome — not response content
 _UI_NOISE = {
@@ -79,23 +80,37 @@ class SentenceBuffer:
         self._prev = ""
         self._partial = ""
         self._in_fence = False
+        self._last_change_time = 0.0
 
     def reset(self):
         self._prev = ""
         self._partial = ""
         self._in_fence = False
+        self._last_change_time = 0.0
 
     def feed(self, current_text: str) -> list[str]:
         """Feed current full text; returns list of new speakable sentences."""
         if not current_text.startswith(self._prev):
-            # Text changed in a non-additive way (new conversation) — reset
             self.reset()
 
         new_chunk = current_text[len(self._prev):]
         self._prev = current_text
 
         if not new_chunk:
+            # No new text — check if we should flush partial
+            if (
+                self._partial
+                and self._last_change_time > 0
+                and time.monotonic() - self._last_change_time >= _FLUSH_AFTER
+            ):
+                sentence = self._partial.strip()
+                self._partial = ""
+                filtered = filter_response(sentence)
+                if len(filtered.split()) >= 4:
+                    return [filtered]
             return []
+
+        self._last_change_time = time.monotonic()
 
         # Track triple-backtick fences — don't speak code
         fence_count = new_chunk.count("```")
@@ -107,7 +122,6 @@ class SentenceBuffer:
         self._partial += new_chunk
         parts = _SENTENCE_END.split(self._partial)
 
-        # All but the last part are complete sentences
         complete = parts[:-1]
         self._partial = parts[-1]
 
@@ -122,33 +136,35 @@ class SentenceBuffer:
 def main():
     print("Claude Desktop voice daemon starting...", flush=True)
     buf = SentenceBuffer()
-    prev_text = ""
+    window = None  # cached window handle
 
     while True:
         if not config.is_enabled():
             time.sleep(0.5)
             buf.reset()
-            prev_text = ""
+            window = None
             continue
 
-        window = _connect_to_claude()
+        # Connect once; only reconnect on failure
         if window is None:
-            print("Claude Desktop not found, retrying...", flush=True)
-            time.sleep(3)
-            buf.reset()
-            prev_text = ""
-            continue
+            window = _connect_to_claude()
+            if window is None:
+                print("Claude Desktop not found, retrying...", flush=True)
+                time.sleep(3)
+                buf.reset()
+                continue
 
         try:
             current_text = _get_response_text(window)
         except Exception:
-            current_text = ""
+            window = None  # force reconnect next tick
+            buf.reset()
+            time.sleep(_POLL_INTERVAL)
+            continue
 
-        if current_text != prev_text:
-            sentences = buf.feed(current_text)
-            for sentence in sentences:
-                speak(sentence)
-            prev_text = current_text
+        sentences = buf.feed(current_text)
+        for sentence in sentences:
+            speak(sentence)
 
         time.sleep(_POLL_INTERVAL)
 
