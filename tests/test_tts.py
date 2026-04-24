@@ -161,3 +161,18 @@ def test_list_voices_elevenlabs_all_skips_category_filter(mocker):
     tts.list_voices(provider="elevenlabs", api_key="sk-test", premade_only=False)
     call_kwargs = mock_get.call_args
     assert "category" not in call_kwargs[1].get("params", {})
+
+
+def test_speak_raises_on_api_error(mocker):
+    mocker.patch("src.tts.config.load", return_value={
+        "enabled": True, "provider": "elevenlabs", "voice_id": "v1",
+        "elevenlabs_api_key": "sk-test", "openai_api_key": "",
+        "openai_voice": "nova", "openai_model": "tts-1",
+    })
+    mock_response = MagicMock()
+    mock_response.raise_for_status.side_effect = Exception("401 Unauthorized")
+    mocker.patch("src.tts.requests.post", return_value=mock_response)
+
+    import pytest
+    with pytest.raises(Exception, match="401"):
+        tts.speak("This text triggers an API call.")
