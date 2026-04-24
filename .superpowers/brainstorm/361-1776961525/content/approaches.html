@@ -1,0 +1,45 @@
+<h2>3 Architecture Approaches</h2>
+<p class="subtitle">Each handles Claude Code + Desktop differently. Pick the one that fits.</p>
+
+<div class="options">
+  <div class="option" data-choice="hook-only" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Hook-Only (Claude Code)</h3>
+      <p>A <code>stop</code> hook fires every time Claude finishes responding. The hook script strips code/tool output, calls ElevenLabs, plays audio. Slash commands toggle it on/off and pick the voice.</p>
+      <div class="pros-cons" style="margin-top:0.75rem">
+        <div class="pros"><h4>Pros</h4><ul><li>Fully automatic</li><li>Zero Claude involvement</li><li>Simple setup</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Claude Code only</li><li>Desktop needs separate solution later</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="hook-mcp" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Hook + MCP Server <span style="color:#7c6fff;font-size:0.8em;margin-left:0.5rem">★ Recommended</span></h3>
+      <p>Hook handles Claude Code automatically. An MCP server exposes a <code>speak()</code> tool — Claude Desktop uses a custom system prompt to call it at the end of each response.</p>
+      <div class="pros-cons" style="margin-top:0.75rem">
+        <div class="pros"><h4>Pros</h4><ul><li>Works on both surfaces</li><li>One TTS engine, two entry points</li><li>Voice/toggle control via MCP tools too</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Desktop needs a system prompt</li><li>Slightly more setup</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="daemon" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Standalone TTS Daemon</h3>
+      <p>A local HTTP server (always running) handles all TTS. Hook and MCP both talk to it. Future: browser extension could hit the same endpoint for claude.ai web.</p>
+      <div class="pros-cons" style="margin-top:0.75rem">
+        <div class="pros"><h4>Pros</h4><ul><li>Most extensible</li><li>One place to manage queue, state, voices</li><li>Web support possible later</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Always-on process to manage</li><li>Overkill for now</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:1.5rem; padding: 1rem; background: rgba(124,111,255,0.1); border-radius: 8px; border-left: 3px solid #7c6fff;">
+  <p class="label">My recommendation</p>
+  <p><strong>Option B</strong> — the hook handles Claude Code automatically (no effort on your part), and the MCP server gives Desktop a clean integration path. You can skip the Desktop system prompt for now and add it later. It's the right shape without being over-engineered.</p>
+</div>

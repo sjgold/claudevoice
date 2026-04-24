@@ -120,3 +120,30 @@ def test_google_defaults_present(tmp_path):
         cfg = config.load()
     assert cfg["google_api_key"] == ""
     assert cfg["google_voice"] == "en-US-Neural2-C"
+
+
+def test_load_handles_corrupt_json(tmp_path):
+    config_path = tmp_path / "voice-config.json"
+    config_path.write_text("this is not json {{{")
+    with patch("src.config.CONFIG_PATH", config_path):
+        from src import config
+        cfg = config.load()
+    assert cfg["enabled"] is False
+    assert cfg["provider"] == "elevenlabs"
+
+
+def test_load_handles_empty_file(tmp_path):
+    config_path = tmp_path / "voice-config.json"
+    config_path.write_text("")
+    with patch("src.config.CONFIG_PATH", config_path):
+        from src import config
+        cfg = config.load()
+    assert cfg["enabled"] is False
+
+
+def test_set_verbosity_rejects_invalid(tmp_path):
+    config_path = tmp_path / "voice-config.json"
+    with patch("src.config.CONFIG_PATH", config_path):
+        from src import config
+        with pytest.raises(ValueError):
+            config.set_verbosity("extreme")

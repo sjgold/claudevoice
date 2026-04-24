@@ -1,12 +1,12 @@
-# ElevenLabs Voice — Design Spec
+# Claude Voice — Multi-Provider TTS — Design Spec
 **Date:** 2026-04-23  
-**Status:** Approved
+**Status:** Approved — Updated 2026-04-23 (added OpenAI TTS provider, added Google Cloud TTS provider)
 
 ---
 
 ## Overview
 
-A personal voice system that makes Claude speak its responses aloud using ElevenLabs TTS. Works automatically on two surfaces: Claude Code CLI (via stop hook) and Claude Desktop (via UIAutomation daemon). No system prompts, no Claude tool calls required — both paths fire without any user or model action beyond toggling the feature on.
+A personal voice system that makes Claude speak its responses aloud using either ElevenLabs or OpenAI TTS. Works automatically on two surfaces: Claude Code CLI (via stop hook) and Claude Desktop (via UIAutomation daemon). No system prompts, no Claude tool calls required — both paths fire without any user or model action beyond toggling the feature on. The active TTS provider is configurable and switchable at any time.
 
 ---
 
@@ -15,7 +15,8 @@ A personal voice system that makes Claude speak its responses aloud using Eleven
 - Claude speaks filtered conversational text automatically after every response
 - Works in Claude Code CLI and Claude Desktop
 - Easily toggled on/off via slash commands in Claude Code
-- User can list and select ElevenLabs voices from within Claude Code
+- User can list and select ElevenLabs premade voices (default) or all voices from within Claude Code
+- User can switch between ElevenLabs, OpenAI, and Google TTS providers
 - Code blocks, tool call output, file diffs, and inline code are never spoken
 
 ---
@@ -29,19 +30,27 @@ Three Python modules shared by both integration paths:
 **`filter.py`** — Text filtering  
 Takes a raw Claude response string and verbosity level. Strips: triple-backtick code fences and their contents, inline backtick code, tool call/result blocks (identified by Claude Code's XML-like markers), file diff blocks. Applies verbosity rules to bullet and numbered lists (lines starting with `-`, `*`, or `N.`). Returns only clean prose. A sentence is kept only if it contains meaningful words (not just punctuation or whitespace).
 
-**`tts.py`** — ElevenLabs TTS + audio playback  
-Accepts a string (either full response or a single sentence). Calls the ElevenLabs `/v1/text-to-speech/{voice_id}` endpoint with streaming enabled. Plays the returned MP3 via `ffplay` (bundled with ffmpeg). Maintains a thread-safe audio queue so sentence-level calls don't overlap. Respects the `enabled` flag in config before making any API call.
+**`tts.py`** — Multi-provider TTS + audio playback  
+Accepts a string (either full response or a single sentence). Routes to ElevenLabs, OpenAI, or Google based on the `provider` field in config. For ElevenLabs: calls `/v1/text-to-speech/{voice_id}` with streaming enabled. For OpenAI: calls `POST /v1/audio/speech` (no streaming — returns a full audio blob) using models `tts-1` or `tts-1-hd` and one of 6 voices: `alloy`, `echo`, `nova`, `onyx`, `shimmer`, `fissure`. For Google: calls `POST https://texttospeech.googleapis.com/v1/text:synthesize?key={api_key}` with request body `{"input": {"text": "..."}, "voice": {"languageCode": "en-US", "name": "en-US-Neural2-C"}, "audioConfig": {"audioEncoding": "MP3"}}`; auth is via API key in the query param (not a header); response audio is base64-encoded in `response.json()["audioContent"]` and must be decoded before playback; no streaming — full audio blob. English Neural2 voices only in v1. Plays the returned MP3 via `ffplay` (bundled with ffmpeg). Maintains a thread-safe audio queue so sentence-level calls don't overlap. Respects the `enabled` flag in config before making any API call.
 
 **`config.py`** — Config read/write  
 Reads and writes `~/.claude/voice-config.json`. Schema:
 ```json
 {
   "enabled": true,
+  "provider": "elevenlabs",
   "voice_id": "21m00Tcm4TlvDq8ikWAM",
-  "api_key": "sk-...",
+  "elevenlabs_api_key": "sk-...",
+  "openai_api_key": "sk-...",
+  "openai_voice": "nova",
+  "openai_model": "tts-1",
+  "google_api_key": "AIza...",
+  "google_voice": "en-US-Neural2-C",
   "verbosity": "low"
 }
 ```
+
+`provider` is `"elevenlabs"`, `"openai"`, or `"google"`. Only the active provider's API key is required — the others may be left empty. The old `api_key` field is replaced by `elevenlabs_api_key`.
 
 `verbosity` controls response style at two levels:
 
@@ -144,22 +153,31 @@ Custom commands in `.claude/commands/voice/`. Each is a markdown file with `$ARG
 |---|---|---|
 | `/voice on` | `voice-on.md` | Sets `enabled: true` in config. Confirms to user. |
 | `/voice off` | `voice-off.md` | Sets `enabled: false` in config. Confirms to user. |
-| `/voice list` | `voice-list.md` | Calls ElevenLabs `/v1/voices`, prints name + ID table. |
+| `/voice list` | `voice-list.md` | Lists ElevenLabs premade voices by default (`category=premade`, ~30-50 voices). `/voice list all` shows all voices including user-created clones. OpenAI and Google always show full list (6 and ~12 voices respectively). |
 | `/voice pick` | `voice-pick.md` | Takes voice name or ID as `$ARGUMENTS`, writes `voice_id` to config. Confirms selection. |
 | `/voice verbosity` | `voice-verbosity.md` | Takes `low`, `medium`, or `high` as `$ARGUMENTS`. Writes `verbosity` to config, then instructs Claude to follow the verbosity rule immediately in the current conversation. Takes effect instantly — no new session needed. |
+| `/voice provider` | `voice-provider.md` | Takes `elevenlabs`, `openai`, or `google` as `$ARGUMENTS`, writes `provider` to config. Confirms switch. |
 
 Commands are shell-executed via Claude — they run a small Python script that updates config and print a confirmation message back into the conversation.
+
+> **Note — ElevenLabs Voice Library vs. API voices:**  
+> ElevenLabs hosts 10,000+ community voices in their Voice Library, but the Voice Library is **not accessible via API on the free tier**. The `/v1/voices` endpoint returns only the user's own voices (created or cloned) plus ElevenLabs' official premade voices. Filtering by `category=premade` returns only the official ElevenLabs voices (~30-50), which is the sensible default for `/voice list`. Users who have created or cloned their own voices can run `/voice list all` to see everything the API returns.
 
 ---
 
 ## Setup Flow (first run)
 
-1. User gets ElevenLabs API key from elevenlabs.io
-2. Runs `python setup.py` — prompts for API key, calls `/v1/voices` to verify, writes config
-3. Installs ffmpeg if not present (setup.py checks and prints instructions)
-4. Hook is registered in `~/.claude/settings.json` by setup.py
-5. Desktop daemon started via `python daemon/desktop-daemon.py` (user adds to Windows startup if desired)
-6. User runs `/voice on` in Claude Code to enable
+1. Runs `python setup.py` — asks user which provider they want (ElevenLabs, OpenAI, or Google)
+2. Prompts for the API key of the chosen provider (offers to set others if desired)
+3. Verifies the key against the chosen provider's API:
+   - ElevenLabs: calls `/v1/voices` to verify key and lets user pick a voice from the returned list
+   - OpenAI: makes a small test TTS call (or calls `/v1/models`) to verify key; lets user pick from the 6 fixed voices (`alloy`, `echo`, `nova`, `onyx`, `shimmer`, `fissure`)
+   - Google: calls the voices list endpoint filtered to `en-US` Neural2 voices to verify key; lets user pick from those voices. Free tier: 1M chars/month.
+4. Writes config with `provider`, the verified key(s), and selected voice
+5. Installs ffmpeg if not present (setup.py checks and prints instructions)
+6. Hook is registered in `~/.claude/settings.json` by setup.py
+7. Desktop daemon started via `python daemon/desktop-daemon.py` (user adds to Windows startup if desired)
+8. User runs `/voice on` in Claude Code to enable
 
 ---
 
@@ -179,14 +197,16 @@ claude voice/
 │   ├── voice_on.py
 │   ├── voice_off.py
 │   ├── voice_list.py
-│   └── voice_pick.py
+│   ├── voice_pick.py
+│   └── voice_provider.py
 ├── .claude/
 │   └── commands/
 │       └── voice/
 │           ├── on.md
 │           ├── off.md
 │           ├── list.md
-│           └── pick.md
+│           ├── pick.md
+│           └── provider.md
 ├── mcp_server/
 │   └── voice-mcp-server.py  # MCP prompt server for Claude Desktop verbosity
 ├── setup.py               # First-run setup
@@ -198,11 +218,23 @@ claude voice/
 ## Dependencies
 
 - **Python 3.10+**
-- `requests` — ElevenLabs API calls
+- `requests` — API calls for ElevenLabs, OpenAI, and Google (no extra packages needed for any provider)
 - `pywinauto` — Windows UIAutomation for desktop daemon
 - `mcp>=1.0.0` — MCP Python SDK for the Claude Desktop prompt server
 - `ffmpeg` / `ffplay` — MP3 playback (user installs separately; setup.py checks)
-- ElevenLabs account (free tier sufficient for personal use)
+- ElevenLabs account (free tier sufficient for personal use) — only required if using ElevenLabs provider
+- OpenAI account — only required if using OpenAI provider
+- Google Cloud account with Text-to-Speech API enabled — only required if using Google provider. Note: Google returns audio as a base64-encoded string in `audioContent`; `tts.py` decodes it before passing to `ffplay`.
+
+---
+
+## Provider Comparison
+
+| Provider | Free Tier | Voices | Quality | Notes |
+|---|---|---|---|---|
+| ElevenLabs | 10k chars/month | ~100, named | Excellent | Best naturalness, voice cloning |
+| OpenAI | None | 6 fixed | Good | Cheapest at scale ($15/1M chars) |
+| Google | 1M chars/month | ~12 (en-US Neural2) | Good | Best free tier; base64 response |
 
 ---
 
@@ -210,5 +242,4 @@ claude voice/
 
 - Claude.ai web support (no hook or accessibility path without a browser extension)
 - Multi-speaker voices or emotion control
-- Local TTS fallback if ElevenLabs is unreachable
 - Conversation history / replay

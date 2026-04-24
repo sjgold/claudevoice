@@ -1,30 +1,32 @@
 # claude-voice
 
-Gives Claude a voice using ElevenLabs TTS. Works automatically in Claude Code CLI and Claude Desktop on Windows — no system prompts, no manual triggers, just turn it on and Claude talks.
+Gives Claude a voice using your choice of TTS provider — ElevenLabs, OpenAI, or Google Cloud TTS. Works automatically in Claude Code CLI and Claude Desktop on Windows. No system prompts, no manual triggers — turn it on and Claude talks.
 
-Claude Code speaks the full response after it finishes. Claude Desktop speaks sentence-by-sentence as Claude streams, so it feels more like a real conversation.
+Claude Code speaks the full response after it finishes (via a `stop` hook). Claude Desktop speaks sentence-by-sentence as Claude streams, so it feels more like a real conversation. Your provider, voice, and settings persist between sessions in `~/.claude/voice-config.json`.
 
 Code blocks, tool output, and file diffs are filtered out. Only the conversational prose gets spoken.
 
 ---
 
-## How it works
+## Providers
 
-**Claude Code** uses a `stop` hook that fires after every response. The hook grabs the last assistant message, strips anything that isn't prose, and sends it to ElevenLabs.
+| Provider | Free Tier | Voices | Notes |
+|---|---|---|---|
+| **ElevenLabs** | 10k chars/month | ~30-50 premade via API (10k+ in community library, free-tier API access is premade only) | Best naturalness; great for voice variety |
+| **OpenAI** | None | 6 fixed (alloy, echo, nova, onyx, shimmer, fissure) | Cheapest at scale (~$15/1M chars) |
+| **Google** | **1M chars/month** | ~12 (en-US Neural2) | Best free tier; excellent quality |
 
-**Claude Desktop** uses a background daemon that watches the app's accessibility tree via Windows UIAutomation. When a new sentence completes and it's not inside a code block, the daemon speaks it immediately.
-
-Both paths share the same ElevenLabs call and filtering logic. Your voice selection persists between sessions in `~/.claude/voice-config.json`.
+You only need one provider to get started. Set up more later with `/voice provider`.
 
 ---
 
 ## Requirements
 
 - Python 3.10+
-- Windows (the desktop daemon uses Windows UIAutomation)
-- [ffmpeg](https://ffmpeg.org/download.html) — install with `winget install ffmpeg` or grab it from the site
-- An [ElevenLabs](https://elevenlabs.io) account — free tier works fine
-- Claude Code CLI (for the slash commands and stop hook)
+- Windows (desktop daemon uses Windows UIAutomation)
+- [ffmpeg](https://ffmpeg.org/download.html) — `winget install ffmpeg`
+- API key for at least one provider (see table above)
+- Claude Code CLI
 - Claude Desktop (optional, for sentence-level streaming)
 
 ---
@@ -39,13 +41,14 @@ python setup.py
 ```
 
 Setup will:
-1. Ask for your ElevenLabs API key
-2. Verify it and show you available voices so you can pick a default
-3. Write your config to `~/.claude/voice-config.json`
-4. Register the stop hook in `~/.claude/settings.json` (merges into existing hooks, doesn't overwrite anything)
+1. Ask which TTS provider you want to use
+2. Prompt for that provider's API key and verify it
+3. Let you pick a default voice
+4. Write config to `~/.claude/voice-config.json`
+5. Register the stop hook in `~/.claude/settings.json`
+6. Register the MCP prompt server for Claude Desktop verbosity control
 
-Once setup is done, voice is installed but off by default. Enable it in Claude Code with:
-
+Voice is off by default after setup. Enable it:
 ```
 /voice on
 ```
@@ -54,19 +57,31 @@ Once setup is done, voice is installed but off by default. Enable it in Claude C
 
 ## Slash Commands
 
-These work inside any Claude Code session.
-
 | Command | What it does |
 |---|---|
 | `/voice on` | Enable TTS |
 | `/voice off` | Disable TTS |
-| `/voice list` | Show all available ElevenLabs voices with their IDs |
-| `/voice pick <name>` | Switch to a different voice — persists between sessions |
+| `/voice list` | Show available voices. ElevenLabs defaults to premade voices; use `/voice list all` for everything |
+| `/voice pick <name>` | Switch voice — persists between sessions |
+| `/voice provider <name>` | Switch provider: `elevenlabs`, `openai`, or `google` |
+| `/voice verbosity <level>` | Set verbosity: `low`, `medium`, or `high` |
 
-Example:
+Examples:
 ```
-/voice pick Rachel
+/voice provider google
+/voice list
+/voice pick en-US-Neural2-F
 ```
+
+---
+
+## Getting API Keys
+
+**ElevenLabs** — [elevenlabs.io](https://elevenlabs.io) → Sign up → Profile → API Keys. Free tier: 10k chars/month.
+
+**OpenAI** — [platform.openai.com](https://platform.openai.com) → API Keys. No free tier; ~$15/1M characters.
+
+**Google Cloud TTS** — [console.cloud.google.com](https://console.cloud.google.com) → Enable "Cloud Text-to-Speech API" → Credentials → Create API Key. Free tier: 1M chars/month (Neural2 voices).
 
 ---
 
@@ -78,20 +93,26 @@ The desktop daemon runs separately and needs to be started once:
 python daemon/desktop-daemon.py
 ```
 
-Make sure Claude Desktop is open before starting the daemon. It'll connect automatically.
+Make sure Claude Desktop is open before starting the daemon. It connects automatically.
 
 To have it start with Windows, add it to Task Scheduler or create a shortcut in your startup folder pointing to:
 ```
 pythonw "C:\path\to\claude-voice\daemon\desktop-daemon.py"
 ```
 
-The daemon respects the same on/off flag as Claude Code. Use `/voice off` in Claude Code (or flip `enabled` in `~/.claude/voice-config.json`) to silence both surfaces at once.
+The daemon respects the same on/off flag as Claude Code. Use `/voice off` in Claude Code (or flip `enabled` in `~/.claude/voice-config.json`) to silence both at once.
+
+If voice stops working in the desktop daemon, the accessibility tree selector may need updating after a Claude Desktop update. Run the inspector to get a fresh tree dump:
+```bash
+python daemon/inspect-tree.py > daemon/tree-dump.txt
+```
+Then look in `tree-dump.txt` for the element containing response text and update `_get_response_text()` in `desktop-daemon.py` accordingly.
 
 ---
 
 ## Verbosity
 
-Long bullet lists can get exhausting to listen to. Voice has three verbosity levels that control how Claude responds — not just how the audio is filtered, but how Claude actually generates its response.
+Long bullet lists can get exhausting to listen to. Three verbosity levels control how Claude responds — not just how audio is filtered, but how Claude generates its response.
 
 ```
 /voice verbosity low
@@ -105,9 +126,7 @@ Long bullet lists can get exhausting to listen to. Voice has three verbosity lev
 | `medium` | Claude limits lists to 5 items and summarizes the rest. |
 | `high` | No constraints — Claude responds however it wants. |
 
-This works in two layers. The slash command (Claude Code) or prompt picker (Claude Desktop) tells Claude directly — in the current conversation — to respond more concisely. No new session needed, takes effect immediately. A post-processing fallback catches anything that slips through.
-
-Your CLAUDE.md is never touched automatically. If you want verbosity to persist across all sessions, add the instruction to your own CLAUDE.md manually.
+Takes effect immediately in the current conversation. No new session needed.
 
 ### Verbosity in Claude Desktop
 
@@ -117,19 +136,53 @@ Claude Desktop has no slash commands, but it does have an MCP prompt picker. Aft
 - **Voice: Medium verbosity**
 - **Voice: High verbosity**
 
-Select one at the start of a conversation and it injects the same directive that `/voice verbosity` would in Claude Code. The setting is also saved to config so the TTS filter stays in sync.
+Select one at the start of a conversation and it injects the same directive that `/voice verbosity` would in Claude Code.
 
 ---
 
-## Voice selection
+## Voice Selection
 
-Run `/voice list` to see what's available on your ElevenLabs account. Then:
+**ElevenLabs**: ElevenLabs has 10,000+ voices in their community library, but only premade official voices (~30-50) are accessible via API on the free tier. `/voice list` shows premade voices by default; `/voice list all` shows everything including any voices you've cloned or created yourself.
 
 ```
-/voice pick Adam
+/voice list          # premade official voices (~30-50)
+/voice list all      # everything on your account
+/voice pick Rachel
 ```
 
-Your selection is saved immediately and survives restarts. The desktop daemon picks it up on the next response without needing a restart.
+**OpenAI**: 6 fixed voices — alloy, echo, nova, onyx, shimmer, fissure. Pick with `/voice pick nova`.
+
+**Google**: `/voice list` shows available en-US Neural2 voices. Pick with `/voice pick en-US-Neural2-F`.
+
+Switch provider at any time:
+```
+/voice provider openai
+/voice list
+/voice pick onyx
+```
+
+---
+
+## Config
+
+Config lives at `~/.claude/voice-config.json`:
+
+```json
+{
+  "enabled": false,
+  "provider": "google",
+  "voice_id": "21m00Tcm4TlvDq8ikWAM",
+  "elevenlabs_api_key": "",
+  "openai_api_key": "",
+  "openai_voice": "nova",
+  "openai_model": "tts-1",
+  "google_api_key": "AIza...",
+  "google_voice": "en-US-Neural2-C",
+  "verbosity": "low"
+}
+```
+
+Only the active provider's key is used. You can store all three and switch freely with `/voice provider`.
 
 ---
 
@@ -157,45 +210,43 @@ The daemon looks for a window with "Claude" in the title. Make sure Claude Deskt
 
 **Desktop daemon finds the window but no audio**
 
-The accessibility tree selector in `daemon/desktop-daemon.py` may need updating if Anthropic changed the Claude Desktop UI. Run the inspector to get a fresh tree dump:
-```bash
-python daemon/inspect-tree.py > daemon/tree-dump.txt
-```
-Then look in `tree-dump.txt` for the element that contains response text and update `_get_response_text()` in `desktop-daemon.py` accordingly.
+See the accessibility tree note in the [Claude Desktop](#claude-desktop-sentence-streaming) section above.
+
+**Switching providers doesn't work**
+
+Make sure you've run setup for that provider (or set the API key manually in `~/.claude/voice-config.json`) and run `/voice list` to confirm voices load correctly.
 
 ---
 
-## Config
-
-Config lives at `~/.claude/voice-config.json`:
-
-```json
-{
-  "enabled": false,
-  "voice_id": "21m00Tcm4TlvDq8ikWAM",
-  "api_key": "your-key-here"
-}
-```
-
-You can edit it directly if you need to — the daemon and hook read it fresh on each response.
-
----
-
-## Project structure
+## Project Structure
 
 ```
 claude-voice/
 ├── src/
-│   ├── config.py          # Config read/write
+│   ├── config.py          # Config read/write (provider, keys, voice)
 │   ├── filter.py          # Strips code blocks, tool output, diffs
-│   └── tts.py             # ElevenLabs API + audio queue
+│   └── tts.py             # Multi-provider TTS (ElevenLabs / OpenAI / Google)
 ├── hooks/
 │   └── stop-hook.py       # Claude Code stop hook
 ├── daemon/
 │   ├── desktop-daemon.py  # Claude Desktop UIAutomation watcher
 │   └── inspect-tree.py    # One-time tool to dump accessibility tree
 ├── commands/              # Python scripts called by slash commands
+│   ├── voice_on.py
+│   ├── voice_off.py
+│   ├── voice_list.py
+│   ├── voice_pick.py
+│   ├── voice_provider.py
+│   └── voice_verbosity.py
 ├── .claude/commands/voice/  # Slash command markdown files
+│   ├── on.md
+│   ├── off.md
+│   ├── list.md
+│   ├── pick.md
+│   ├── provider.md
+│   └── verbosity.md
+├── mcp_server/
+│   └── voice-mcp-server.py  # MCP prompts for Claude Desktop verbosity
 ├── tests/
 └── setup.py
 ```

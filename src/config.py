@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from filelock import FileLock
 
 CONFIG_PATH = Path.home() / ".claude" / "voice-config.json"
 
@@ -20,14 +21,30 @@ _DEFAULTS = {
 def load() -> dict:
     if not CONFIG_PATH.exists():
         return _DEFAULTS.copy()
-    with open(CONFIG_PATH) as f:
-        return {**_DEFAULTS, **json.load(f)}
+    try:
+        with open(CONFIG_PATH) as f:
+            data = json.load(f)
+        if not isinstance(data, dict):
+            return _DEFAULTS.copy()
+        return {**_DEFAULTS, **data}
+    except (json.JSONDecodeError, ValueError):
+        return _DEFAULTS.copy()
 
 
 def save(cfg: dict) -> None:
+    import os
+    import tempfile
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(CONFIG_PATH, "w") as f:
-        json.dump(cfg, f, indent=2)
+    lock = FileLock(str(CONFIG_PATH) + ".lock")
+    with lock:
+        tmp_fd, tmp_path = tempfile.mkstemp(dir=CONFIG_PATH.parent, suffix=".tmp")
+        try:
+            with os.fdopen(tmp_fd, "w") as f:
+                json.dump(cfg, f, indent=2)
+            os.replace(tmp_path, CONFIG_PATH)
+        except Exception:
+            os.unlink(tmp_path)
+            raise
 
 
 def set_enabled(value: bool) -> None:
@@ -37,6 +54,8 @@ def set_enabled(value: bool) -> None:
 
 
 def set_voice(voice_id: str) -> None:
+    if not voice_id or not voice_id.strip():
+        raise ValueError("voice_id cannot be empty.")
     cfg = load()
     cfg["voice_id"] = voice_id
     save(cfg)

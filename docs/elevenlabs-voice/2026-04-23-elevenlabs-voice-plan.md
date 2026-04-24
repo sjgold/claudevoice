@@ -36,10 +36,12 @@
 | `commands/voice_off.py` | Set enabled=false in config, print confirmation |
 | `commands/voice_list.py` | Fetch ElevenLabs voice list, print formatted table |
 | `commands/voice_pick.py` | Accept voice name/ID arg, write to config, confirm — voice persists in JSON across restarts |
+| `commands/voice_provider.py` | Accept provider arg (elevenlabs|openai), write to config, confirm |
 | `.claude/commands/voice/on.md` | Slash command: `/voice on` |
 | `.claude/commands/voice/off.md` | Slash command: `/voice off` |
 | `.claude/commands/voice/list.md` | Slash command: `/voice list` |
 | `.claude/commands/voice/pick.md` | Slash command: `/voice pick <name>` |
+| `.claude/commands/voice/provider.md` | Slash command: `/voice provider <elevenlabs\|openai>` |
 | `setup.py` | First-run: prompt API key, verify, write config, check ffmpeg, register stop hook in settings.json |
 | `requirements.txt` | Python dependencies |
 | `tests/test_config.py` | Tests for config.py |
@@ -125,18 +127,18 @@ def test_load_returns_defaults_when_no_file(tmp_path):
         cfg = config.load()
     assert cfg["enabled"] is False
     assert cfg["voice_id"] == "21m00Tcm4TlvDq8ikWAM"
-    assert cfg["api_key"] == ""
+    assert cfg["elevenlabs_api_key"] == ""
 
 
 def test_save_and_load_roundtrip(tmp_path):
     config_path = tmp_path / "voice-config.json"
     with patch("src.config.CONFIG_PATH", config_path):
         from src import config
-        config.save({"enabled": True, "voice_id": "abc123", "api_key": "sk-test"})
+        config.save({"enabled": True, "voice_id": "abc123", "elevenlabs_api_key": "sk-test"})
         cfg = config.load()
     assert cfg["enabled"] is True
     assert cfg["voice_id"] == "abc123"
-    assert cfg["api_key"] == "sk-test"
+    assert cfg["elevenlabs_api_key"] == "sk-test"
 
 
 def test_set_enabled_persists(tmp_path):
@@ -184,6 +186,55 @@ def test_load_merges_missing_keys(tmp_path):
     assert cfg["api_key"] == "sk-existing"
     assert cfg["enabled"] is False  # default applied for missing key
     assert cfg["voice_id"] == "21m00Tcm4TlvDq8ikWAM"
+
+
+def test_provider_defaults_to_elevenlabs(tmp_path):
+    config_path = tmp_path / "voice-config.json"
+    with patch("src.config.CONFIG_PATH", config_path):
+        from src import config
+        cfg = config.load()
+    assert cfg["provider"] == "elevenlabs"
+
+def test_set_provider_persists(tmp_path):
+    config_path = tmp_path / "voice-config.json"
+    with patch("src.config.CONFIG_PATH", config_path):
+        from src import config
+        config.set_provider("openai")
+        assert config.get_provider() == "openai"
+
+def test_google_defaults_present(tmp_path):
+    config_path = tmp_path / "voice-config.json"
+    with patch("src.config.CONFIG_PATH", config_path):
+        from src import config
+        cfg = config.load()
+    assert cfg["google_api_key"] == ""
+    assert cfg["google_voice"] == "en-US-Neural2-C"
+
+def test_set_provider_accepts_google(tmp_path):
+    config_path = tmp_path / "voice-config.json"
+    with patch("src.config.CONFIG_PATH", config_path):
+        from src import config
+        config.set_provider("google")
+        assert config.get_provider() == "google"
+
+def test_set_provider_rejects_invalid(tmp_path):
+    # Update existing test — google is now valid, keep testing a bad value
+    config_path = tmp_path / "voice-config.json"
+    with patch("src.config.CONFIG_PATH", config_path):
+        from src import config
+        with pytest.raises(ValueError):
+            config.set_provider("amazon")
+
+def test_load_merges_missing_keys_with_openai_defaults(tmp_path):
+    config_path = tmp_path / "voice-config.json"
+    config_path.write_text(json.dumps({"elevenlabs_api_key": "sk-existing"}))
+    with patch("src.config.CONFIG_PATH", config_path):
+        from src import config
+        cfg = config.load()
+    assert cfg["elevenlabs_api_key"] == "sk-existing"
+    assert cfg["openai_api_key"] == ""
+    assert cfg["openai_voice"] == "nova"
+    assert cfg["openai_model"] == "tts-1"
 ```
 
 - [ ] **Step 2: Run tests to confirm they fail**
@@ -204,8 +255,14 @@ CONFIG_PATH = Path.home() / ".claude" / "voice-config.json"
 
 _DEFAULTS = {
     "enabled": False,
+    "provider": "elevenlabs",
     "voice_id": "21m00Tcm4TlvDq8ikWAM",
-    "api_key": "",
+    "elevenlabs_api_key": "",
+    "openai_api_key": "",
+    "openai_voice": "nova",
+    "openai_model": "tts-1",
+    "google_api_key": "",
+    "google_voice": "en-US-Neural2-C",
     "verbosity": "low",
 }
 
@@ -243,6 +300,18 @@ def set_verbosity(level: str) -> None:
     save(cfg)
 
 
+def set_provider(provider: str) -> None:
+    if provider not in ("elevenlabs", "openai", "google"):
+        raise ValueError(f"Invalid provider: {provider!r}. Use elevenlabs, openai, or google.")
+    cfg = load()
+    cfg["provider"] = provider
+    save(cfg)
+
+
+def get_provider() -> str:
+    return load()["provider"]
+
+
 def is_enabled() -> bool:
     return load()["enabled"]
 ```
@@ -253,7 +322,7 @@ def is_enabled() -> bool:
 cd "C:/Users/SJG/Documents/CodePlayground/claude voice" && python -m pytest tests/test_config.py -v
 ```
 
-Expected: 5 passed.
+Expected: 7 passed.
 
 - [ ] **Step 5: Commit**
 
@@ -483,7 +552,7 @@ git add src/filter.py tests/test_filter.py && git commit -m "feat: text filter s
 - Create: `src/tts.py`
 - Create: `tests/test_tts.py`
 
-Calls ElevenLabs API and plays MP3 via ffplay. A thread-safe audio queue ensures sentences don't overlap when called rapidly from the desktop daemon.
+Calls ElevenLabs or OpenAI TTS API (depending on configured provider) and plays MP3 via ffplay. A thread-safe audio queue ensures sentences don't overlap when called rapidly from the desktop daemon.
 
 - [ ] **Step 1: Write failing tests**
 
@@ -497,7 +566,9 @@ from src import tts
 
 def test_speak_does_nothing_when_disabled(mocker):
     mocker.patch("src.tts.config.load", return_value={
-        "enabled": False, "voice_id": "abc", "api_key": "sk-test"
+        "enabled": False, "provider": "elevenlabs", "voice_id": "abc",
+        "elevenlabs_api_key": "sk-test", "openai_api_key": "",
+        "openai_voice": "nova", "openai_model": "tts-1",
     })
     mock_post = mocker.patch("src.tts.requests.post")
     tts.speak("Hello world, this is a test.")
@@ -506,7 +577,9 @@ def test_speak_does_nothing_when_disabled(mocker):
 
 def test_speak_does_nothing_for_empty_text(mocker):
     mocker.patch("src.tts.config.load", return_value={
-        "enabled": True, "voice_id": "abc", "api_key": "sk-test"
+        "enabled": True, "provider": "elevenlabs", "voice_id": "abc",
+        "elevenlabs_api_key": "sk-test", "openai_api_key": "",
+        "openai_voice": "nova", "openai_model": "tts-1",
     })
     mock_post = mocker.patch("src.tts.requests.post")
     tts.speak("   ")
@@ -515,7 +588,9 @@ def test_speak_does_nothing_for_empty_text(mocker):
 
 def test_speak_calls_elevenlabs_with_correct_params(mocker):
     mocker.patch("src.tts.config.load", return_value={
-        "enabled": True, "voice_id": "voice-abc", "api_key": "sk-test-key"
+        "enabled": True, "provider": "elevenlabs", "voice_id": "voice-abc",
+        "elevenlabs_api_key": "sk-test-key", "openai_api_key": "",
+        "openai_voice": "nova", "openai_model": "tts-1",
     })
     mock_response = MagicMock()
     mock_response.content = b"mp3data"
@@ -533,7 +608,9 @@ def test_speak_calls_elevenlabs_with_correct_params(mocker):
 
 def test_speak_enqueues_audio_bytes(mocker):
     mocker.patch("src.tts.config.load", return_value={
-        "enabled": True, "voice_id": "v1", "api_key": "sk-x"
+        "enabled": True, "provider": "elevenlabs", "voice_id": "v1",
+        "elevenlabs_api_key": "sk-x", "openai_api_key": "",
+        "openai_voice": "nova", "openai_model": "tts-1",
     })
     mock_response = MagicMock()
     mock_response.content = b"fakemp3"
@@ -553,13 +630,97 @@ def test_list_voices_returns_name_and_id(mocker):
             {"voice_id": "id2", "name": "Adam"},
         ]
     }
+    mocker.patch("src.tts.config.load", return_value={
+        "provider": "elevenlabs", "elevenlabs_api_key": "sk-test", "openai_api_key": ""
+    })
     mocker.patch("src.tts.requests.get", return_value=mock_response)
 
-    voices = tts.list_voices("sk-test")
+    voices = tts.list_voices()
 
     assert len(voices) == 2
     assert voices[0] == {"voice_id": "id1", "name": "Rachel"}
     assert voices[1] == {"voice_id": "id2", "name": "Adam"}
+
+
+def test_speak_routes_to_openai_when_provider_is_openai(mocker):
+    mocker.patch("src.tts.config.load", return_value={
+        "enabled": True, "provider": "openai", "voice_id": "v1",
+        "elevenlabs_api_key": "", "openai_api_key": "sk-oai",
+        "openai_voice": "nova", "openai_model": "tts-1",
+    })
+    mock_response = MagicMock()
+    mock_response.content = b"oaiaudio"
+    mock_post = mocker.patch("src.tts.requests.post", return_value=mock_response)
+    mocker.patch("src.tts._play_audio")
+
+    tts.speak("This sentence is long enough to be spoken aloud.")
+
+    call_url = mock_post.call_args[0][0]
+    assert "openai.com" in call_url
+    assert mock_post.call_args[1]["json"]["voice"] == "nova"
+
+
+def test_list_voices_returns_openai_fixed_voices(mocker):
+    mocker.patch("src.tts.config.load", return_value={
+        "provider": "openai", "elevenlabs_api_key": "", "openai_api_key": "sk-oai"
+    })
+    voices = tts.list_voices(provider="openai")
+    assert len(voices) == 6
+    names = [v["name"] for v in voices]
+    assert "Nova" in names
+
+
+def test_speak_routes_to_google_when_provider_is_google(mocker):
+    mocker.patch("src.tts.config.load", return_value={
+        "enabled": True, "provider": "google", "voice_id": "v1",
+        "elevenlabs_api_key": "", "openai_api_key": "",
+        "google_api_key": "AIza-test", "google_voice": "en-US-Neural2-C",
+    })
+    import base64
+    fake_audio = base64.b64encode(b"fakemp3").decode()
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"audioContent": fake_audio}
+    mock_post = mocker.patch("src.tts.requests.post", return_value=mock_response)
+    mocker.patch("src.tts._play_audio")
+
+    tts.speak("This sentence is long enough to be spoken aloud.")
+
+    call_url = mock_post.call_args[0][0]
+    assert "texttospeech.googleapis.com" in call_url
+
+def test_list_voices_returns_google_neural2_only(mocker):
+    mock_response = MagicMock()
+    mock_response.json.return_value = {
+        "voices": [
+            {"name": "en-US-Neural2-A", "ssmlGender": "MALE"},
+            {"name": "en-US-Neural2-C", "ssmlGender": "FEMALE"},
+            {"name": "en-US-Standard-A", "ssmlGender": "MALE"},  # should be filtered out
+        ]
+    }
+    mocker.patch("src.tts.requests.get", return_value=mock_response)
+    voices = tts.list_voices(provider="google", api_key="AIza-test")
+    assert len(voices) == 2
+    assert all("Neural2" in v["voice_id"] for v in voices)
+    assert not any("Standard" in v["voice_id"] for v in voices)
+
+def test_list_voices_elevenlabs_filters_premade_by_default(mocker):
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"voices": [
+        {"voice_id": "id1", "name": "Rachel"},
+        {"voice_id": "id2", "name": "Adam"},
+    ]}
+    mock_get = mocker.patch("src.tts.requests.get", return_value=mock_response)
+    tts.list_voices(provider="elevenlabs", api_key="sk-test")
+    call_kwargs = mock_get.call_args
+    assert call_kwargs[1]["params"]["category"] == "premade"
+
+def test_list_voices_elevenlabs_all_skips_category_filter(mocker):
+    mock_response = MagicMock()
+    mock_response.json.return_value = {"voices": []}
+    mock_get = mocker.patch("src.tts.requests.get", return_value=mock_response)
+    tts.list_voices(provider="elevenlabs", api_key="sk-test", premade_only=False)
+    call_kwargs = mock_get.call_args
+    assert "category" not in call_kwargs[1].get("params", {})
 ```
 
 - [ ] **Step 2: Run tests to confirm they fail**
@@ -573,6 +734,7 @@ Expected: `ModuleNotFoundError: No module named 'src.tts'`
 - [ ] **Step 3: Implement src/tts.py**
 
 ```python
+import base64
 import subprocess
 import threading
 import queue
@@ -581,8 +743,13 @@ import requests
 
 from src import config
 
-_ELEVENLABS_TTS_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
-_ELEVENLABS_VOICES_URL = "https://api.elevenlabs.io/v1/voices"
+_EL_TTS_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
+_EL_VOICES_URL = "https://api.elevenlabs.io/v1/voices"
+_OAI_TTS_URL = "https://api.openai.com/v1/audio/speech"
+_GOOGLE_TTS_URL = "https://texttospeech.googleapis.com/v1/text:synthesize"
+_GOOGLE_VOICES_URL = "https://texttospeech.googleapis.com/v1/voices"
+
+OPENAI_VOICES = ["alloy", "echo", "fissure", "nova", "onyx", "shimmer"]
 
 _audio_queue: queue.Queue = queue.Queue()
 _worker: threading.Thread | None = None
@@ -614,14 +781,10 @@ def _ensure_worker() -> None:
             _worker.start()
 
 
-def speak(text: str) -> None:
-    cfg = config.load()
-    if not cfg["enabled"] or not text.strip():
-        return
-    _ensure_worker()
+def _speak_elevenlabs(text: str, cfg: dict) -> None:
     resp = requests.post(
-        _ELEVENLABS_TTS_URL.format(voice_id=cfg["voice_id"]),
-        headers={"xi-api-key": cfg["api_key"], "Content-Type": "application/json"},
+        _EL_TTS_URL.format(voice_id=cfg["voice_id"]),
+        headers={"xi-api-key": cfg["elevenlabs_api_key"], "Content-Type": "application/json"},
         json={
             "text": text,
             "model_id": "eleven_monolingual_v1",
@@ -633,15 +796,83 @@ def speak(text: str) -> None:
     _audio_queue.put(resp.content)
 
 
-def list_voices(api_key: str) -> list[dict]:
+def _speak_openai(text: str, cfg: dict) -> None:
+    resp = requests.post(
+        _OAI_TTS_URL,
+        headers={"Authorization": f"Bearer {cfg['openai_api_key']}", "Content-Type": "application/json"},
+        json={
+            "model": cfg.get("openai_model", "tts-1"),
+            "input": text,
+            "voice": cfg.get("openai_voice", "nova"),
+        },
+        timeout=15,
+    )
+    resp.raise_for_status()
+    _audio_queue.put(resp.content)
+
+
+def _speak_google(text: str, cfg: dict) -> None:
+    resp = requests.post(
+        f"{_GOOGLE_TTS_URL}?key={cfg['google_api_key']}",
+        json={
+            "input": {"text": text},
+            "voice": {"languageCode": "en-US", "name": cfg.get("google_voice", "en-US-Neural2-C")},
+            "audioConfig": {"audioEncoding": "MP3"},
+        },
+        timeout=15,
+    )
+    resp.raise_for_status()
+    audio_bytes = base64.b64decode(resp.json()["audioContent"])
+    _audio_queue.put(audio_bytes)
+
+
+def speak(text: str) -> None:
+    cfg = config.load()
+    if not cfg["enabled"] or not text.strip():
+        return
+    _ensure_worker()
+    provider = cfg.get("provider", "elevenlabs")
+    if provider == "openai":
+        _speak_openai(text, cfg)
+    elif provider == "google":
+        _speak_google(text, cfg)
+    else:
+        _speak_elevenlabs(text, cfg)
+
+
+def list_voices(provider: str | None = None, api_key: str | None = None, premade_only: bool = True) -> list[dict]:
+    cfg = config.load()
+    provider = provider or cfg.get("provider", "elevenlabs")
+    if provider == "openai":
+        return [{"voice_id": v, "name": v.capitalize()} for v in OPENAI_VOICES]
+    if provider == "google":
+        key = api_key or cfg["google_api_key"]
+        resp = requests.get(
+            f"{_GOOGLE_VOICES_URL}?key={key}&languageCode=en-US",
+            timeout=10,
+        )
+        resp.raise_for_status()
+        voices = [
+            v for v in resp.json()["voices"]
+            if "Neural2" in v["name"]
+        ]
+        return [{"voice_id": v["name"], "name": v["name"]} for v in sorted(voices, key=lambda x: x["name"])]
+    # ElevenLabs
+    key = api_key or cfg["elevenlabs_api_key"]
+    params = {}
+    if premade_only:
+        params["category"] = "premade"
     resp = requests.get(
-        _ELEVENLABS_VOICES_URL,
-        headers={"xi-api-key": api_key},
+        _EL_VOICES_URL,
+        headers={"xi-api-key": key},
+        params=params,
         timeout=10,
     )
     resp.raise_for_status()
     return [{"voice_id": v["voice_id"], "name": v["name"]} for v in resp.json()["voices"]]
 ```
+
+**Note on `premade_only` (ElevenLabs):** ElevenLabs has 10,000+ community voices, but the Voice Library is NOT accessible via API on the free tier. The `/v1/voices` endpoint returns the user's own voices plus the official premade voices. Passing `category=premade` filters to ~30–50 official ElevenLabs voices — the sensible default for new users. Setting `premade_only=False` (triggered by `/voice list all`) shows everything including the user's cloned/generated voices.
 
 - [ ] **Step 4: Run tests to confirm they pass**
 
@@ -649,12 +880,12 @@ def list_voices(api_key: str) -> list[dict]:
 cd "C:/Users/SJG/Documents/CodePlayground/claude voice" && python -m pytest tests/test_tts.py -v
 ```
 
-Expected: 5 passed.
+Expected: 11 passed.
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/tts.py tests/test_tts.py && git commit -m "feat: ElevenLabs TTS with threaded audio queue"
+git add src/tts.py tests/test_tts.py && git commit -m "feat: multi-provider TTS with ElevenLabs, OpenAI, and Google backends"
 ```
 
 ---
@@ -859,12 +1090,19 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src import config, tts
 
 cfg = config.load()
-if not cfg["api_key"]:
+provider = cfg.get("provider", "elevenlabs")
+
+if not cfg.get("elevenlabs_api_key") and not cfg.get("openai_api_key") and not cfg.get("google_api_key"):
     print("No API key set. Run setup.py first.")
     sys.exit(1)
 
-voices = tts.list_voices(cfg["api_key"])
-current = cfg["voice_id"]
+premade_only = "--all" not in sys.argv and "all" not in sys.argv
+
+voices = tts.list_voices(premade_only=premade_only)
+current = cfg.get("voice_id") or cfg.get("openai_voice") or cfg.get("google_voice")
+
+if provider == "elevenlabs" and premade_only:
+    print("Showing premade voices. Use '/voice list all' to see all voices including your own.\n")
 
 print(f"{'NAME':<30} {'ID':<40} {'ACTIVE'}")
 print("-" * 75)
@@ -933,7 +1171,25 @@ print(f"VERBOSITY:{level}")
 
 Note: The script prints `VERBOSITY:<level>` as a signal. The slash command markdown file (Task 7) reads this and injects the directive into the conversation.
 
-- [ ] **Step 6: Smoke-test the scripts manually**
+- [ ] **Step 6: Create commands/voice_provider.py**
+
+```python
+#!/usr/bin/env python
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from src import config
+
+if len(sys.argv) < 2 or sys.argv[1] not in ("elevenlabs", "openai", "google"):
+    print("Usage: voice_provider.py <elevenlabs|openai|google>")
+    sys.exit(1)
+
+provider = sys.argv[1]
+config.set_provider(provider)
+print(f"TTS provider set to '{provider}'.")
+```
+
+- [ ] **Step 7: Smoke-test the scripts manually**
 
 ```bash
 cd "C:/Users/SJG/Documents/CodePlayground/claude voice"
@@ -947,10 +1203,10 @@ Voice is now ON.
 Voice is now OFF.
 ```
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add commands/ && git commit -m "feat: slash command Python scripts for voice on/off/list/pick/verbosity"
+git add commands/ && git commit -m "feat: slash command Python scripts for voice on/off/list/pick/verbosity/provider"
 ```
 
 ---
@@ -994,13 +1250,13 @@ Print the exact output to the user.
 - [ ] **Step 3: Create .claude/commands/voice/list.md**
 
 ```markdown
-Run this command to list available ElevenLabs voices:
+Run this command to list available voices for the current TTS provider:
 
 ```bash
-python "C:/Users/SJG/Documents/CodePlayground/claude voice/commands/voice_list.py"
+python "C:/Users/SJG/Documents/CodePlayground/claude voice/commands/voice_list.py" $ARGUMENTS
 ```
 
-Print the full table output to the user.
+Print the full table output to the user. If the provider is ElevenLabs and no arguments were given, note that `/voice list all` shows all voices including user-created ones.
 ```
 
 - [ ] **Step 4: Create .claude/commands/voice/pick.md**
@@ -1035,10 +1291,22 @@ Then, based on the level, immediately adopt the following rule for the rest of t
 Confirm to the user: "Verbosity set to [level] — taking effect now in this conversation."
 ```
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Create .claude/commands/voice/provider.md**
+
+```markdown
+Run this command to switch the TTS provider. The provider is: $ARGUMENTS
 
 ```bash
-git add .claude/ && git commit -m "feat: slash command markdown files for /voice on/off/list/pick/verbosity"
+python "C:/Users/SJG/Documents/CodePlayground/claude voice/commands/voice_provider.py" "$ARGUMENTS"
+```
+
+Print the exact output to the user.
+```
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add .claude/ && git commit -m "feat: slash command markdown files for /voice on/off/list/pick/verbosity/provider"
 ```
 
 ---
@@ -1338,13 +1606,14 @@ from pathlib import Path
 
 HOOK_SCRIPT = Path(__file__).parent / "hooks" / "stop-hook.py"
 SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
+OPENAI_VOICES = ["alloy", "echo", "fissure", "nova", "onyx", "shimmer"]
 
 
 def check_ffmpeg() -> bool:
     return shutil.which("ffplay") is not None
 
 
-def verify_api_key(api_key: str) -> list[dict] | None:
+def verify_elevenlabs_key(api_key: str) -> list[dict] | None:
     import requests
     try:
         resp = requests.get(
@@ -1359,6 +1628,20 @@ def verify_api_key(api_key: str) -> list[dict] | None:
         return None
 
 
+def verify_openai_key(api_key: str) -> bool:
+    import requests
+    try:
+        resp = requests.post(
+            "https://api.openai.com/v1/audio/speech",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json={"model": "tts-1", "input": "test", "voice": "nova"},
+            timeout=10,
+        )
+        return resp.status_code == 200
+    except Exception:
+        return False
+
+
 def register_hook(hook_command: str) -> None:
     settings = {}
     if SETTINGS_PATH.exists():
@@ -1368,7 +1651,6 @@ def register_hook(hook_command: str) -> None:
     hooks = settings.setdefault("hooks", {})
     stop_hooks = hooks.setdefault("Stop", [])
 
-    # Remove any existing claude-voice hook entry to avoid duplicates
     stop_hooks = [
         h for h in stop_hooks
         if not any("stop-hook.py" in str(cmd.get("command", "")) for cmd in h.get("hooks", []))
@@ -1385,10 +1667,98 @@ def register_hook(hook_command: str) -> None:
         json.dump(settings, f, indent=2)
 
 
+def setup_elevenlabs(cfg: dict) -> dict:
+    api_key = input("Enter your ElevenLabs API key (from elevenlabs.io): ").strip()
+    if not api_key:
+        print("No API key provided.")
+        sys.exit(1)
+    print("Verifying ElevenLabs API key...", end=" ", flush=True)
+    voices = verify_elevenlabs_key(api_key)
+    if voices is None:
+        print("FAILED\nInvalid API key or network error.")
+        sys.exit(1)
+    print(f"OK ({len(voices)} voices available)")
+    print("\nAvailable voices:")
+    for i, v in enumerate(voices[:10], 1):
+        print(f"  {i:2}. {v['name']}")
+    if len(voices) > 10:
+        print(f"  ... and {len(voices) - 10} more (use /voice list to see all)")
+    choice = input("\nEnter voice number for default [1]: ").strip() or "1"
+    try:
+        selected = voices[int(choice) - 1]
+    except (ValueError, IndexError):
+        selected = voices[0]
+    print(f"Selected: {selected['name']}")
+    cfg["elevenlabs_api_key"] = api_key
+    cfg["voice_id"] = selected["voice_id"]
+    return cfg
+
+
+def setup_openai(cfg: dict) -> dict:
+    api_key = input("Enter your OpenAI API key (from platform.openai.com): ").strip()
+    if not api_key:
+        print("No API key provided.")
+        sys.exit(1)
+    print("Verifying OpenAI API key...", end=" ", flush=True)
+    if not verify_openai_key(api_key):
+        print("FAILED\nInvalid API key or network error.")
+        sys.exit(1)
+    print("OK")
+    print("\nAvailable voices:")
+    for i, v in enumerate(OPENAI_VOICES, 1):
+        print(f"  {i}. {v}")
+    choice = input("\nEnter voice number for default [4 = nova]: ").strip() or "4"
+    try:
+        selected = OPENAI_VOICES[int(choice) - 1]
+    except (ValueError, IndexError):
+        selected = "nova"
+    print(f"Selected: {selected}")
+    cfg["openai_api_key"] = api_key
+    cfg["openai_voice"] = selected
+    cfg["openai_model"] = "tts-1"
+    return cfg
+
+
+def verify_google_key(api_key: str) -> list[dict] | None:
+    try:
+        resp = requests.get(
+            f"https://texttospeech.googleapis.com/v1/voices?key={api_key}&languageCode=en-US",
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            return [v for v in resp.json()["voices"] if "Neural2" in v["name"]]
+        return None
+    except Exception:
+        return None
+
+def setup_google(cfg: dict) -> dict:
+    api_key = input("Enter your Google Cloud TTS API key: ").strip()
+    if not api_key:
+        print("No API key provided.")
+        sys.exit(1)
+    print("Verifying Google API key...", end=" ", flush=True)
+    voices = verify_google_key(api_key)
+    if voices is None:
+        print("FAILED\nInvalid API key or network error.")
+        sys.exit(1)
+    print(f"OK ({len(voices)} Neural2 voices available)")
+    print("\nAvailable en-US Neural2 voices:")
+    for i, v in enumerate(sorted(voices, key=lambda x: x["name"]), 1):
+        print(f"  {i:2}. {v['name']}")
+    choice = input("\nEnter voice number for default [1]: ").strip() or "1"
+    try:
+        selected = sorted(voices, key=lambda x: x["name"])[int(choice) - 1]
+    except (ValueError, IndexError):
+        selected = {"name": "en-US-Neural2-C"}
+    print(f"Selected: {selected['name']}")
+    cfg["google_api_key"] = api_key
+    cfg["google_voice"] = selected["name"]
+    return cfg
+
+
 def main():
     print("=== Claude Voice Setup ===\n")
 
-    # Check ffmpeg
     if check_ffmpeg():
         print("✓ ffplay found")
     else:
@@ -1397,51 +1767,57 @@ def main():
         print("  Then re-run setup.py\n")
         sys.exit(1)
 
-    # Get API key
-    api_key = input("Enter your ElevenLabs API key (from elevenlabs.io/app/speech-synthesis): ").strip()
-    if not api_key:
-        print("No API key provided. Exiting.")
-        sys.exit(1)
+    print("\nWhich TTS provider do you want to use?")
+    print("  1. ElevenLabs (free tier: 10k chars/month, best quality, named voices)")
+    print("  2. OpenAI     (no free tier, ~$15/1M chars, 6 voices, simplest)")
+    print("  3. Google     (free tier: 1M chars/month, en-US Neural2 voices)")
+    provider_choice = input("\nEnter 1, 2, or 3 [1]: ").strip() or "1"
+    if provider_choice == "2":
+        provider = "openai"
+    elif provider_choice == "3":
+        provider = "google"
+    else:
+        provider = "elevenlabs"
+    print(f"Using: {provider}\n")
 
-    # Verify key
-    print("Verifying API key...", end=" ", flush=True)
-    voices = verify_api_key(api_key)
-    if voices is None:
-        print("FAILED\nInvalid API key or network error.")
-        sys.exit(1)
-    print(f"OK ({len(voices)} voices available)")
-
-    # Pick default voice
-    print("\nAvailable voices:")
-    for i, v in enumerate(voices[:10], 1):
-        print(f"  {i:2}. {v['name']}")
-    if len(voices) > 10:
-        print(f"  ... and {len(voices) - 10} more (use /voice list to see all)")
-
-    choice = input("\nEnter voice number for default [1]: ").strip() or "1"
-    try:
-        idx = int(choice) - 1
-        selected = voices[idx]
-    except (ValueError, IndexError):
-        selected = voices[0]
-    print(f"Selected: {selected['name']}")
-
-    # Write config
     sys.path.insert(0, str(Path(__file__).parent))
-    from src import config
-    config.save({
-        "enabled": False,
-        "voice_id": selected["voice_id"],
-        "api_key": api_key,
-    })
-    print(f"✓ Config saved to {config.CONFIG_PATH}")
+    from src import config as cfg_module
 
-    # Register hook
+    cfg = cfg_module._DEFAULTS.copy()
+    cfg["provider"] = provider
+
+    if provider == "elevenlabs":
+        cfg = setup_elevenlabs(cfg)
+        also = input("\nAlso set up OpenAI as a backup provider? [y/N]: ").strip().lower()
+        if also == "y":
+            cfg = setup_openai(cfg)
+        also2 = input("\nAlso set up Google as a backup provider? [y/N]: ").strip().lower()
+        if also2 == "y":
+            cfg = setup_google(cfg)
+    elif provider == "openai":
+        cfg = setup_openai(cfg)
+        also = input("\nAlso set up ElevenLabs as a backup provider? [y/N]: ").strip().lower()
+        if also == "y":
+            cfg = setup_elevenlabs(cfg)
+        also2 = input("\nAlso set up Google as a backup provider? [y/N]: ").strip().lower()
+        if also2 == "y":
+            cfg = setup_google(cfg)
+    else:
+        cfg = setup_google(cfg)
+        also = input("\nAlso set up ElevenLabs as a backup provider? [y/N]: ").strip().lower()
+        if also == "y":
+            cfg = setup_elevenlabs(cfg)
+        also2 = input("\nAlso set up OpenAI as a backup provider? [y/N]: ").strip().lower()
+        if also2 == "y":
+            cfg = setup_openai(cfg)
+
+    cfg_module.save(cfg)
+    print(f"\n✓ Config saved to {cfg_module.CONFIG_PATH}")
+
     hook_cmd = f'python "{HOOK_SCRIPT.resolve()}"'
     register_hook(hook_cmd)
     print(f"✓ Stop hook registered in {SETTINGS_PATH}")
 
-    # Register MCP server in Claude Desktop config
     desktop_config = Path(os.environ["APPDATA"]) / "Claude" / "claude_desktop_config.json"
     if desktop_config.exists():
         with open(desktop_config) as f:
@@ -1462,7 +1838,6 @@ def main():
     print("\n=== Setup complete ===")
     print("Run /voice on in Claude Code to enable voice.")
     print("Run 'python daemon/desktop-daemon.py' to start the Claude Desktop daemon.")
-    print("In Claude Desktop, use the prompt picker to set verbosity (Voice: Low/Medium/High).")
 
 
 if __name__ == "__main__":

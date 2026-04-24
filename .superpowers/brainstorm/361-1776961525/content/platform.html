@@ -1,0 +1,31 @@
+<h2>Where does voice need to work?</h2>
+<p class="subtitle">Select all the Claude surfaces you want voice support on. This shapes the whole architecture.</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="claude-code" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Claude Code CLI</h3>
+      <p>Terminal-based. Has <strong>hooks</strong> — shell scripts that fire when Claude stops responding. Most powerful integration point.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="claude-desktop" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Claude Desktop App</h3>
+      <p>Windows/Mac native app. No official hooks, but screen/clipboard monitoring is possible.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="claude-web" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Claude.ai Web</h3>
+      <p>Browser-based. Would require a browser extension or separate tool to intercept responses.</p>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:2rem; padding: 1rem; background: rgba(255,255,255,0.05); border-radius: 8px; border-left: 3px solid #7c6fff;">
+  <p class="label">Note</p>
+  <p>Claude Code hooks are the <strong>cleanest</strong> integration — they fire automatically when Claude finishes a response and can capture the full text. Other surfaces require workarounds.</p>
+</div>

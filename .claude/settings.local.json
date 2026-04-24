@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node \"C:/Users/SJG/.claude/plugins/cache/openai-codex/codex/1.0.3/scripts/codex-companion.mjs\" status)",
+      "WebSearch",
+      "Bash(cat)",
+      "Read(//c/c/Users/SJG/Documents/CodePlayground/claude voice/**)",
+      "Bash(mkdir -p src tests hooks commands daemon mcp_server)",
+      "Bash(touch src/__init__.py tests/__init__.py hooks/__init__.py commands/__init__.py daemon/__init__.py mcp_server/__init__.py)",
+      "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+      "Bash(python -m pytest tests/ -v)",
+      "Bash(python -m pytest tests/test_config.py -v)",
+      "Bash(pip install *)"
+    ]
+  }
+}

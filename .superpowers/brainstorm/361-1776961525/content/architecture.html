@@ -1,0 +1,86 @@
+<h2>System Architecture</h2>
+<p class="subtitle">Two automatic trigger paths, one shared voice engine underneath.</p>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5rem;margin-bottom:1.5rem">
+
+  <!-- Claude Code path -->
+  <div class="mockup">
+    <div class="mockup-header">Claude Code Path</div>
+    <div class="mockup-body" style="font-size:0.9em">
+      <div style="display:flex;flex-direction:column;gap:0.75rem">
+        <div style="background:rgba(255,255,255,0.07);padding:0.75rem;border-radius:6px;border-left:3px solid #7c6fff">
+          <strong>stop hook fires</strong>
+          <p style="margin:0.25rem 0 0;opacity:0.7;font-size:0.85em">Claude Code calls the hook script with the full response text when Claude finishes generating</p>
+        </div>
+        <div style="text-align:center;opacity:0.4">↓</div>
+        <div style="background:rgba(255,255,255,0.07);padding:0.75rem;border-radius:6px;border-left:3px solid #4caf97">
+          <strong>Text filter</strong>
+          <p style="margin:0.25rem 0 0;opacity:0.7;font-size:0.85em">Strip code fences, inline code, tool call blocks, file diffs — keep only prose sentences</p>
+        </div>
+        <div style="text-align:center;opacity:0.4">↓ full filtered response</div>
+        <div style="background:rgba(255,255,255,0.07);padding:0.75rem;border-radius:6px;border-left:3px solid #f0a500">
+          <strong>ElevenLabs → audio</strong>
+          <p style="margin:0.25rem 0 0;opacity:0.7;font-size:0.85em">Calls API with selected voice, streams MP3, plays immediately</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Claude Desktop path -->
+  <div class="mockup">
+    <div class="mockup-header">Claude Desktop Path</div>
+    <div class="mockup-body" style="font-size:0.9em">
+      <div style="display:flex;flex-direction:column;gap:0.75rem">
+        <div style="background:rgba(255,255,255,0.07);padding:0.75rem;border-radius:6px;border-left:3px solid #7c6fff">
+          <strong>UIAutomation daemon</strong>
+          <p style="margin:0.25rem 0 0;opacity:0.7;font-size:0.85em">Python background process watches Claude Desktop's accessibility tree for new streamed text</p>
+        </div>
+        <div style="text-align:center;opacity:0.4">↓ sentence completes</div>
+        <div style="background:rgba(255,255,255,0.07);padding:0.75rem;border-radius:6px;border-left:3px solid #4caf97">
+          <strong>Text filter (same)</strong>
+          <p style="margin:0.25rem 0 0;opacity:0.7;font-size:0.85em">Same filter logic — rejects sentences inside code/tool blocks, speaks clean prose sentences as they complete</p>
+        </div>
+        <div style="text-align:center;opacity:0.4">↓ sentence by sentence</div>
+        <div style="background:rgba(255,255,255,0.07);padding:0.75rem;border-radius:6px;border-left:3px solid #f0a500">
+          <strong>ElevenLabs → audio</strong>
+          <p style="margin:0.25rem 0 0;opacity:0.7;font-size:0.85em">Each sentence queued and spoken as it arrives — feels like real-time conversation</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Shared layer -->
+<div style="background:rgba(124,111,255,0.12);border:1px solid rgba(124,111,255,0.3);border-radius:8px;padding:1rem;margin-bottom:1.5rem">
+  <p class="label" style="margin-bottom:0.5rem">Shared Voice Engine (Python module)</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.75rem;font-size:0.85em">
+    <div style="background:rgba(255,255,255,0.05);padding:0.6rem;border-radius:5px">
+      <strong>filter.py</strong><br><span style="opacity:0.6">Strips code blocks, tool calls, diffs. Returns clean prose only.</span>
+    </div>
+    <div style="background:rgba(255,255,255,0.05);padding:0.6rem;border-radius:5px">
+      <strong>tts.py</strong><br><span style="opacity:0.6">ElevenLabs API call + MP3 playback. Audio queue for sentence streaming.</span>
+    </div>
+    <div style="background:rgba(255,255,255,0.05);padding:0.6rem;border-radius:5px">
+      <strong>config.json</strong><br><span style="opacity:0.6">Stores: enabled flag, selected voice ID, ElevenLabs API key.</span>
+    </div>
+  </div>
+</div>
+
+<!-- Slash commands -->
+<div style="background:rgba(255,255,255,0.04);border-radius:8px;padding:1rem">
+  <p class="label" style="margin-bottom:0.5rem">Slash Commands (Claude Code)</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:0.5rem;font-size:0.85em">
+    <div style="background:rgba(255,255,255,0.07);padding:0.5rem;border-radius:5px;text-align:center">
+      <code>/voice on</code><br><span style="opacity:0.6;font-size:0.85em">Enable TTS</span>
+    </div>
+    <div style="background:rgba(255,255,255,0.07);padding:0.5rem;border-radius:5px;text-align:center">
+      <code>/voice off</code><br><span style="opacity:0.6;font-size:0.85em">Disable TTS</span>
+    </div>
+    <div style="background:rgba(255,255,255,0.07);padding:0.5rem;border-radius:5px;text-align:center">
+      <code>/voice list</code><br><span style="opacity:0.6;font-size:0.85em">Show voices</span>
+    </div>
+    <div style="background:rgba(255,255,255,0.07);padding:0.5rem;border-radius:5px;text-align:center">
+      <code>/voice pick</code><br><span style="opacity:0.6;font-size:0.85em">Select a voice</span>
+    </div>
+  </div>
+</div>
