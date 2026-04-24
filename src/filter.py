@@ -55,8 +55,25 @@ def filter_response(text: str, verbosity: str = "low") -> str:
     # Normalize Windows line endings
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     text = _CODE_FENCE.sub("", text)
-    # Handle unclosed fence: if a ``` remains, strip from it to end of text
-    text = re.sub(r"```.*", "", text, flags=re.DOTALL)
+    # Handle unclosed fence: remove ``` and code until prose resumes
+    def remove_unclosed_fence(match):
+        before = match.group(1)
+        after = match.group(2)
+        # Find where prose resumes: look for line that starts at column 0 without leading spaces
+        lines = after.split('\n')
+        prose_start = 0
+        for i, line in enumerate(lines):
+            # Prose typically starts at column 0 and contains sentences (capital letter, words)
+            if line and not line[0].isspace() and len(line.split()) > 2:
+                prose_start = i
+                break
+        else:
+            # No prose found, all content is code
+            return before.rstrip()
+        # Keep the prose part
+        prose = '\n'.join(lines[prose_start:])
+        return before.rstrip() + '\n' + prose
+    text = re.sub(r"([\s\S]*?)```([\s\S]*)", remove_unclosed_fence, text)
     text = _TOOL_BLOCK.sub("", text)
     text = _INLINE_CODE.sub("", text)
     text = _MARKDOWN_HEADER.sub("", text)

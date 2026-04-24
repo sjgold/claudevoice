@@ -10,7 +10,9 @@
       "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
       "Bash(python -m pytest tests/ -v)",
       "Bash(python -m pytest tests/test_config.py -v)",
-      "Bash(pip install *)"
+      "Bash(pip install *)",
+      "Bash(python -m pytest tests/test_filter.py -v)",
+      "Bash(python -m pytest tests/test_filter.py::test_unclosed_code_fence_does_not_leak tests/test_filter.py::test_unclosed_code_fence_preserves_following_prose -v)"
     ]
   }
 }

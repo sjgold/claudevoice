@@ -59,12 +59,16 @@ The slash command markdown file instructs Claude to run the config script AND ad
 
 | Level | In-conversation instruction to Claude |
 |---|---|
-| `"low"` | Summarize lists of 3+ items in 1–2 sentences. Max 2 bullet points per response. Note how many items were condensed. |
-| `"medium"` | Limit bullet lists to 5 items. Summarize anything beyond that. |
+| `"low"` | Summarize any list as a single sentence. Do not use bullet points. Example: "There are four considerations: X, Y, Z, and one more." |
+| `"medium"` | Limit bullet lists to 3 items. If you have more, include the most important 3 and note how many were omitted. |
 | `"high"` | No special constraints on format or length. |
 
 **Fallback — post-processing filter (`filter.py`):**  
 Still truncates lists in the text before TTS as a safety net, using the same limits. Catches cases where Claude doesn't follow the directive, and handles Claude Desktop (which doesn't go through the slash command system).
+
+- `low` — replaces entire list block with "The response included a list of N items."
+- `medium` — keeps first 3 bullets, appends "...and N more."
+- `high` — no truncation
 
 `~/.claude/CLAUDE.md` is never written to automatically. Users who want verbosity to persist across all sessions can add the instruction to their own CLAUDE.md manually.
 

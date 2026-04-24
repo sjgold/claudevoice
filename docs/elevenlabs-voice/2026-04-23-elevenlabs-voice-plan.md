@@ -406,29 +406,22 @@ def test_extract_sentences_handles_question_and_exclamation():
     assert len(sentences) == 3
 
 
-def test_low_verbosity_truncates_long_bullet_list():
+def test_low_verbosity_summarizes_lists():
     text = "Here are the steps:\n- First do this\n- Then do that\n- Also this\n- And this too\n- Finally this"
     result = filter_response(text, verbosity="low")
-    assert "First do this" in result
-    assert "Then do that" not in result
-    assert "4 more" in result
+    assert "The response included a list of 5 items" in result
+    assert "First do this" not in result
 
 
-def test_low_verbosity_keeps_short_list():
-    text = "Two options:\n- Option A\n- Option B"
-    result = filter_response(text, verbosity="low")
-    assert "Option A" in result
-    assert "Option B" in result
-
-
-def test_medium_verbosity_reads_up_to_five_bullets():
-    items = "\n".join(f"- Item {i}" for i in range(1, 7))
+def test_medium_verbosity_keeps_three_bullets():
+    items = "\n".join(f"- Item {i}" for i in range(1, 6))
     text = f"The list:\n{items}"
     result = filter_response(text, verbosity="medium")
     assert "Item 1" in result
-    assert "Item 5" in result
-    assert "Item 6" not in result
-    assert "1 more" in result
+    assert "Item 2" in result
+    assert "Item 3" in result
+    assert "Item 4" not in result
+    assert "2 more" in result
 
 
 def test_high_verbosity_reads_all_bullets():
@@ -474,12 +467,9 @@ _HORIZONTAL_RULE = re.compile(r"^\s*[-*_]{3,}\s*$", re.MULTILINE)
 _LIST_ITEM = re.compile(r"^(\s*(?:[-*]|\d+\.)\s+.+)$", re.MULTILINE)
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
-_VERBOSITY_LIMITS = {"low": 2, "medium": 5, "high": float("inf")}
-
 
 def _apply_verbosity(text: str, verbosity: str) -> str:
-    limit = _VERBOSITY_LIMITS.get(verbosity, 2)
-    if limit == float("inf"):
+    if verbosity == "high":
         return text
 
     lines = text.splitlines(keepends=True)
@@ -490,11 +480,14 @@ def _apply_verbosity(text: str, verbosity: str) -> str:
     def flush_list():
         if not list_items:
             return
-        kept = list_items[:int(limit)]
-        remaining = len(list_items) - len(kept)
-        result.extend(kept)
-        if remaining > 0:
-            result.append(f"  ... and {remaining} more point{'s' if remaining > 1 else ''}.\n")
+        if verbosity == "low":
+            result.append(f"The response included a list of {len(list_items)} items.\n")
+        elif verbosity == "medium":
+            kept = list_items[:3]
+            remaining = len(list_items) - 3
+            result.extend(kept)
+            if remaining > 0:
+                result.append(f"  ...and {remaining} more.\n")
 
     for line in lines:
         if _LIST_ITEM.match(line):
@@ -1282,9 +1275,9 @@ python "C:/Users/SJG/Documents/CodePlayground/claude voice/commands/voice_verbos
 
 Then, based on the level, immediately adopt the following rule for the rest of this conversation:
 
-**If level is "low":** When you would normally give a list of 3 or more items, summarize them in 1–2 sentences instead (e.g. "There are four considerations: the main one is X, along with Y, Z, and one more"). Maximum 2 bullet points per response.
+**If level is "low":** Do not use bullet lists. Summarize any list as a single sentence. Example: "There are four considerations: X, Y, Z, and one more."
 
-**If level is "medium":** When using bullet lists, limit to 5 items. If you have more, include the most important 5 and note how many were omitted.
+**If level is "medium":** When using bullet lists, limit to 3 items. If you have more, include the most important 3 and note how many were omitted (e.g. "...and 2 more").
 
 **If level is "high":** No special constraints on format or length.
 

@@ -12,11 +12,19 @@ Code blocks, tool output, and file diffs are filtered out. Only the conversation
 
 | Provider | Free Tier | Voices | Notes |
 |---|---|---|---|
-| **ElevenLabs** | 10k chars/month | ~30-50 premade via API (10k+ in community library, free-tier API access is premade only) | Best naturalness; great for voice variety |
-| **OpenAI** | None | 6 fixed (alloy, echo, nova, onyx, shimmer, fissure) | Cheapest at scale (~$15/1M chars) |
-| **Google** | **1M chars/month** | ~12 (en-US Neural2) | Best free tier; excellent quality |
+| **ElevenLabs** | 10,000 chars/month | ~30-50 premade via API | Best naturalness; recurring free tier |
+| **OpenAI** | $5 one-time credit (new accounts only) | 6 fixed | Effectively paid; $15/1M chars after credit |
+| **Google** | **1M chars/month** Neural2, 4M chars/month Standard (recurring) | ~12 en-US Neural2 | Best free tier for ongoing use |
 
 You only need one provider to get started. Set up more later with `/voice provider`.
+
+## Which provider should I use?
+
+**For free ongoing use → Google.** 1 million Neural2 characters per month, recurring. That's roughly 10–15 hours of Claude voice per month for free.
+
+**For the best voice quality → ElevenLabs.** The most natural-sounding voices with 10,000 free characters per month — about 10–15 minutes of audio. Good for light use; upgrade to a paid plan for daily use.
+
+**For OpenAI users → OpenAI TTS.** If you already have an OpenAI API account with credits, it's the simplest setup. No recurring free tier — you pay per character ($15/1M chars).
 
 ---
 
@@ -79,7 +87,9 @@ Examples:
 
 **ElevenLabs** — [elevenlabs.io](https://elevenlabs.io) → Sign up → Profile → API Keys. Free tier: 10k chars/month.
 
-**OpenAI** — [platform.openai.com](https://platform.openai.com) → API Keys. No free tier; ~$15/1M characters.
+**OpenAI** — [platform.openai.com](https://platform.openai.com) → API Keys.
+
+> **Note:** OpenAI TTS has no recurring free tier. New accounts get $5 in one-time credits (~333k characters), after which you pay per use.
 
 **Google Cloud TTS** — [console.cloud.google.com](https://console.cloud.google.com) → Enable "Cloud Text-to-Speech API" → Credentials → Create API Key. Free tier: 1M chars/month (Neural2 voices).
 

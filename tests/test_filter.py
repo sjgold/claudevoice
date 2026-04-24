@@ -117,9 +117,16 @@ def test_filter_response_normalizes_windows_line_endings():
 
 
 def test_unclosed_code_fence_does_not_leak():
-    text = "Here is some code:\n```python\ndef foo():\n    pass\nAnd some more prose after."
+    text = "Here is some code:\n```python\ndef foo():\n    pass"
     result = filter_response(text)
     assert "def foo" not in result
+
+
+def test_unclosed_code_fence_preserves_following_prose():
+    text = "Here is some code:\n```python\ndef foo():\n    pass\nThis prose should survive after the unclosed fence."
+    result = filter_response(text)
+    assert "def foo" not in result
+    assert "This prose should survive after the unclosed fence." in result
 
 
 def test_filter_response_rejects_invalid_verbosity():
