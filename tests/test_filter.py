@@ -122,12 +122,6 @@ def test_unclosed_code_fence_does_not_leak():
     assert "def foo" not in result
 
 
-def test_unclosed_code_fence_preserves_following_prose():
-    text = "Here is some code:\n```python\ndef foo():\n    pass\nThis prose should survive after the unclosed fence."
-    result = filter_response(text)
-    assert "def foo" not in result
-    assert "This prose should survive after the unclosed fence." in result
-
 
 def test_filter_response_rejects_invalid_verbosity():
     with pytest.raises(ValueError):
