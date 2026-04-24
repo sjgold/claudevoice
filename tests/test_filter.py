@@ -1,3 +1,4 @@
+import pytest
 from src.filter import filter_response, extract_prose_sentences
 
 
@@ -58,29 +59,28 @@ def test_extract_sentences_handles_question_and_exclamation():
     assert len(sentences) == 3
 
 
-def test_low_verbosity_truncates_long_bullet_list():
+def test_low_verbosity_replaces_list_with_summary():
     text = "Here are the steps:\n- First do this\n- Then do that\n- Also this\n- And this too\n- Finally this"
     result = filter_response(text, verbosity="low")
-    assert "First do this" in result
-    assert "Then do that" not in result
-    assert "4 more" in result
+    assert "First do this" not in result
+    assert "The response included a list of 5 items." in result
 
 
-def test_low_verbosity_keeps_short_list():
+def test_low_verbosity_replaces_short_list_too():
     text = "Two options:\n- Option A\n- Option B"
     result = filter_response(text, verbosity="low")
-    assert "Option A" in result
-    assert "Option B" in result
+    assert "Option A" not in result
+    assert "The response included a list of 2 items." in result
 
 
-def test_medium_verbosity_reads_up_to_five_bullets():
+def test_medium_verbosity_keeps_three_bullets():
     items = "\n".join(f"- Item {i}" for i in range(1, 7))
     text = f"The list:\n{items}"
     result = filter_response(text, verbosity="medium")
     assert "Item 1" in result
-    assert "Item 5" in result
-    assert "Item 6" not in result
-    assert "1 more" in result
+    assert "Item 3" in result
+    assert "Item 4" not in result
+    assert "3 more" in result
 
 
 def test_high_verbosity_reads_all_bullets():
@@ -103,3 +103,25 @@ def test_strips_horizontal_rules():
     assert "---" not in result
     assert "First point." in result
     assert "Second point here." in result
+
+
+def test_filter_response_handles_none_input():
+    result = filter_response(None)
+    assert result == ""
+
+
+def test_filter_response_normalizes_windows_line_endings():
+    text = "Hello world.\r\n- Item one\r\n- Item two\r\nDone."
+    result = filter_response(text, verbosity="high")
+    assert "\r" not in result
+
+
+def test_unclosed_code_fence_does_not_leak():
+    text = "Here is some code:\n```python\ndef foo():\n    pass\nAnd some more prose after."
+    result = filter_response(text)
+    assert "def foo" not in result
+
+
+def test_filter_response_rejects_invalid_verbosity():
+    with pytest.raises(ValueError):
+        filter_response("some text", verbosity="extreme")
