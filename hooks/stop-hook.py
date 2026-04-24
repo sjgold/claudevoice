@@ -30,6 +30,8 @@ def main():
 
     transcript = data.get("transcript", [])
     raw_text = extract_last_assistant_text(transcript)
+    if not raw_text:
+        return
     filtered = f.filter_response(raw_text)
     tts.speak(filtered)
 

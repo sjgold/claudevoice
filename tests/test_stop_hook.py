@@ -45,9 +45,7 @@ def test_skips_when_no_assistant_message(mocker):
     mock_speak = mocker.MagicMock()
     payload = {"transcript": [{"role": "user", "content": "Hello"}]}
     _load_and_run_hook(payload, mock_speak)
-    # Hook still calls speak() but with empty string; tts.speak handles the no-op
-    if mock_speak.called:
-        assert mock_speak.call_args[0][0].strip() == ""
+    mock_speak.assert_not_called()
 
 
 def test_handles_content_block_array(mocker):
