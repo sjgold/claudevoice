@@ -1,4 +1,5 @@
 import base64
+import shutil
 import subprocess
 import threading
 import queue
@@ -6,6 +7,15 @@ import queue
 import requests
 
 from src import config
+
+# Locate ffplay at import time — needed because Claude Code's subprocess PATH
+# may not include winget-installed binaries on Windows.
+_FFPLAY_FALLBACKS = [
+    r"C:\Users\SJG\AppData\Local\Microsoft\WinGet\Packages\Gyan.FFmpeg.Essentials_Microsoft.Winget.Source_8wekyb3d8bbwe\ffmpeg-8.1-essentials_build\bin\ffplay.exe",
+]
+_FFPLAY = shutil.which("ffplay") or next(
+    (p for p in _FFPLAY_FALLBACKS if shutil.os.path.isfile(p)), "ffplay"
+)
 
 _EL_TTS_URL = "https://api.elevenlabs.io/v1/text-to-speech/{voice_id}"
 _EL_VOICES_URL = "https://api.elevenlabs.io/v1/voices"
@@ -22,7 +32,7 @@ _worker_lock = threading.Lock()
 
 def _play_audio(mp3_bytes: bytes) -> None:
     proc = subprocess.Popen(
-        ["ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", "-"],
+        [_FFPLAY, "-nodisp", "-autoexit", "-loglevel", "quiet", "-"],
         stdin=subprocess.PIPE,
     )
     proc.communicate(mp3_bytes)
@@ -51,7 +61,7 @@ def _speak_elevenlabs(text: str, cfg: dict) -> None:
         headers={"xi-api-key": cfg["elevenlabs_api_key"], "Content-Type": "application/json"},
         json={
             "text": text,
-            "model_id": "eleven_monolingual_v1",
+            "model_id": "eleven_turbo_v2_5",
             "voice_settings": {"stability": 0.5, "similarity_boost": 0.75},
         },
         timeout=15,

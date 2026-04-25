@@ -19,11 +19,10 @@ def _load_and_run_hook(payload: dict, mock_speak):
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
 
-    # After loading, patch the tts module in the loaded module
-    mod.tts.speak = mock_speak
-
-    # Run main with payload on stdin
-    with patch("sys.stdin", StringIO(json.dumps(payload))):
+    # Patch tts.speak with auto-restore — mod.tts IS the singleton src.tts module,
+    # so direct assignment leaks the mock into other test files.
+    with patch.object(mod.tts, "speak", mock_speak), \
+         patch("sys.stdin", StringIO(json.dumps(payload))):
         mod.main()
 
 

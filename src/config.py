@@ -7,7 +7,7 @@ CONFIG_PATH = Path.home() / ".claude" / "voice-config.json"
 _DEFAULTS = {
     "enabled": False,
     "provider": "elevenlabs",
-    "voice_id": "21m00Tcm4TlvDq8ikWAM",
+    "voice_id": "EXAVITQu4vr4xnSDxMaL",
     "elevenlabs_api_key": "",
     "openai_api_key": "",
     "openai_voice": "nova",

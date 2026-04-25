@@ -11,7 +11,7 @@ def test_load_returns_defaults_when_no_file(tmp_path):
         cfg = config.load()
     assert cfg["enabled"] is False
     assert cfg["provider"] == "elevenlabs"
-    assert cfg["voice_id"] == "21m00Tcm4TlvDq8ikWAM"
+    assert cfg["voice_id"] == "EXAVITQu4vr4xnSDxMaL"
     assert cfg["elevenlabs_api_key"] == ""
     assert cfg["openai_api_key"] == ""
     assert cfg["openai_voice"] == "nova"
@@ -76,7 +76,7 @@ def test_load_merges_missing_keys(tmp_path):
         cfg = config.load()
     assert cfg["elevenlabs_api_key"] == "sk-existing"
     assert cfg["enabled"] is False
-    assert cfg["voice_id"] == "21m00Tcm4TlvDq8ikWAM"
+    assert cfg["voice_id"] == "EXAVITQu4vr4xnSDxMaL"
     assert cfg["google_api_key"] == ""
     assert cfg["openai_voice"] == "nova"
 
