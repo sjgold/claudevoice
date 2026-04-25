@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(python -m pytest *)",
-      "Bash(ffplay -version)"
+      "Bash(ffplay -version)",
+      "Bash(grep -nE \"AIza[0-9A-Za-z_-]{30,}|sk-[A-Za-z0-9]{30,}|sk_[a-f0-9]{40,}|sk-proj-[A-Za-z0-9]{20,}\")"
     ]
   }
 }

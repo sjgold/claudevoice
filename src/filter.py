@@ -7,6 +7,8 @@ _MARKDOWN_HEADER = re.compile(r"^#{1,6}\s+", re.MULTILINE)
 _HORIZONTAL_RULE = re.compile(r"^\s*[-*_]{3,}\s*$", re.MULTILINE)
 _LIST_ITEM = re.compile(r"^(\s*(?:[-*]|\d+\.)\s+.+)$", re.MULTILINE)
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
+_SENTENCE_CAPS = {"1": 1, "2": 2}
+
 
 def _apply_verbosity(text: str, verbosity: str) -> str:
     if verbosity not in ("1", "2", "3", "4"):
@@ -14,7 +16,7 @@ def _apply_verbosity(text: str, verbosity: str) -> str:
     if verbosity in ("3", "4"):
         return text
 
-    limit = 0 if verbosity == "1" else 3  # 1=0 bullets, 2=3 bullets
+    limit = 0 if verbosity == "1" else 3
 
     lines = text.splitlines(keepends=True)
     result = []
@@ -24,7 +26,7 @@ def _apply_verbosity(text: str, verbosity: str) -> str:
     def flush_list():
         total = len(list_items)
         if verbosity == "1":
-            result.append(f"The response included a list of {total} item{'s' if total != 1 else ''}.\n")
+            result.append(f"[{total} item{'s' if total != 1 else ''} not read aloud].\n")
             return
         kept = list_items[:limit]
         remaining = total - len(kept)
@@ -35,6 +37,8 @@ def _apply_verbosity(text: str, verbosity: str) -> str:
     for line in lines:
         if _LIST_ITEM.match(line):
             in_list = True
+            list_items.append(line)
+        elif in_list and not line.strip():
             list_items.append(line)
         else:
             if in_list:
@@ -63,7 +67,15 @@ def filter_response(text: str, verbosity: str = "2") -> str:
     text = _HORIZONTAL_RULE.sub("", text)
     text = _apply_verbosity(text, verbosity)
     text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
+    text = text.strip()
+    cap = _SENTENCE_CAPS.get(verbosity)
+    if cap:
+        parts = _SENTENCE_SPLIT.split(text)
+        if len(parts) > cap:
+            text = " ".join(p.strip() for p in parts[:cap])
+            if not text.endswith((".", "!", "?")):
+                text += "."
+    return text
 
 
 def extract_prose_sentences(text: str, verbosity: str = "2") -> list[str]:

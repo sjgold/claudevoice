@@ -4,4 +4,4 @@ Run this command to disable voice TTS:
 python "$CLAUDE_PROJECT_DIR/commands/voice_off.py"
 ```
 
-Confirm with only: "Voice off."
+Verbosity resets to level 4 (no constraints). Confirm with only: "Voice off."

@@ -4,6 +4,6 @@ Run this command to enable voice TTS:
 python "$CLAUDE_PROJECT_DIR/commands/voice_on.py"
 ```
 
-Then invoke the `voice-caveman` skill via the Skill tool (no args — it reads the current verbosity from `~/.claude/voice-config.json`).
+The command prints the current verbosity level (e.g. "Verbosity: 2"). Invoke the `voice-caveman` skill via the Skill tool, passing that verbosity level as args.
 
-After the skill is loaded, confirm with only: "Voice on."
+Confirm with only: "Voice on."
