@@ -1,0 +1,8 @@
+Looking for Claude Desktop window...
+Found 5 Claude-related windows:
+  title='Agent tool input (tjo534) - claude voice - Visual Studio Code'  class='Chrome_WidgetWin_1'
+  title='\u2733 Claude Code'  class='CASCADIA_HOSTING_WINDOW_CLASS'
+  title='PeonPing/peon-ping: Warcraft III Peon voice notifications (+ more!) for Claude Code, Codex, IDEs, and any AI agent. Stop babysitting your terminal. Employ a Peon today. — Mozilla Firefox'  class='MozillaWindowClass'
+  title='Claude'  class='Chrome_WidgetWin_1'
+  title='PROJECT_PLAN.md — C:\\Users\\SJG\\Documents\\Claude\\Projects\\InnerUmbra\\etsy-field-guide — Pulsar'  class='Chrome_WidgetWin_1'
+Dumping: 'Claude'
