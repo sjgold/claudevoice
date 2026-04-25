@@ -34,6 +34,7 @@ def main():
         return
     filtered = f.filter_response(raw_text)
     tts.speak(filtered)
+    tts._audio_queue.join()
 
 
 if __name__ == "__main__":
