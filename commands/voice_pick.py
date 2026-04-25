@@ -14,12 +14,17 @@ provider = cfg.get("provider", "elevenlabs")
 
 voices = tts.list_voices()
 
+q = query.lower()
 match = next((v for v in voices if v["voice_id"] == query), None)
 if not match:
-    match = next((v for v in voices if v["name"].lower() == query.lower()), None)
+    match = next((v for v in voices if v["name"].lower() == q), None)
+if not match:
+    match = next((v for v in voices if v["name"].split(" - ")[0].lower() == q), None)
+if not match:
+    match = next((v for v in voices if q in v["name"].lower()), None)
 if not match:
     print(f"No voice found matching '{query}'. Run /voice list to see options.")
     sys.exit(1)
 
 config.set_voice(match["voice_id"])
-print(f"Voice set to '{match['name']}' (ID: {match['voice_id']}). This selection persists between sessions.")
+print(f"Voice set to {match['name'].split(' - ')[0]}.")
