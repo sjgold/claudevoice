@@ -1,8 +1,15 @@
 import json
+import os
 from pathlib import Path
 from filelock import FileLock
 
 CONFIG_PATH = Path.home() / ".claude" / "voice-config.json"
+
+_ENV_KEYS = {
+    "elevenlabs_api_key": "ELEVENLABS_API_KEY",
+    "openai_api_key": "OPENAI_API_KEY",
+    "google_api_key": "GOOGLE_API_KEY",
+}
 
 _DEFAULTS = {
     "enabled": False,
@@ -14,21 +21,27 @@ _DEFAULTS = {
     "openai_model": "tts-1",
     "google_api_key": "",
     "google_voice": "en-US-Neural2-C",
-    "verbosity": "low",
+    "verbosity": "2",
 }
 
 
 def load() -> dict:
-    if not CONFIG_PATH.exists():
-        return _DEFAULTS.copy()
-    try:
-        with open(CONFIG_PATH) as f:
-            data = json.load(f)
-        if not isinstance(data, dict):
-            return _DEFAULTS.copy()
-        return {**_DEFAULTS, **data}
-    except (json.JSONDecodeError, ValueError):
-        return _DEFAULTS.copy()
+    if CONFIG_PATH.exists():
+        try:
+            with open(CONFIG_PATH) as f:
+                data = json.load(f)
+            if not isinstance(data, dict):
+                data = {}
+        except (json.JSONDecodeError, ValueError):
+            data = {}
+    else:
+        data = {}
+    cfg = {**_DEFAULTS, **data}
+    for cfg_key, env_var in _ENV_KEYS.items():
+        env_val = os.environ.get(env_var)
+        if env_val:
+            cfg[cfg_key] = env_val
+    return cfg
 
 
 def save(cfg: dict) -> None:
@@ -62,8 +75,8 @@ def set_voice(voice_id: str) -> None:
 
 
 def set_verbosity(level: str) -> None:
-    if level not in ("low", "medium", "high"):
-        raise ValueError(f"Invalid verbosity: {level!r}. Use low, medium, or high.")
+    if level not in ("1", "2", "3", "4"):
+        raise ValueError(f"Invalid verbosity: {level!r}. Use 1, 2, 3, or 4.")
     cfg = load()
     cfg["verbosity"] = level
     save(cfg)

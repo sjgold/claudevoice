@@ -54,12 +54,17 @@ Setup will:
 3. Let you pick a default voice
 4. Write config to `~/.claude/voice-config.json`
 5. Register the stop hook in `~/.claude/settings.json`
-6. Register the MCP prompt server for Claude Desktop verbosity control
+6. Register the verbosity-injection hook (`UserPromptSubmit`) so caveman directives stay active every turn
+7. Register the MCP prompt server for Claude Desktop verbosity control
 
 Voice is off by default after setup. Enable it:
 ```
 /voice on
 ```
+
+### How verbosity stays enforced
+
+Verbosity rules are enforced via the bundled `voice-caveman` skill at `.claude/skills/voice-caveman/SKILL.md`. The skill is automatically invoked when you run `/voice on` or `/voice verbosity <N>` — Claude Code loads it for the rest of the conversation, with hard word-count ceilings per level. No personal config edits required.
 
 ---
 
@@ -72,7 +77,7 @@ Voice is off by default after setup. Enable it:
 | `/voice list` | Show available voices. ElevenLabs defaults to premade voices; use `/voice list all` for everything |
 | `/voice pick <name>` | Switch voice — persists between sessions |
 | `/voice provider <name>` | Switch provider: `elevenlabs`, `openai`, or `google` |
-| `/voice verbosity <level>` | Set verbosity: `low`, `medium`, or `high` |
+| `/voice verbosity <level>` | Set verbosity: `1` (most compressed) through `4` (no constraints) |
 
 Examples:
 ```
@@ -122,29 +127,32 @@ Then look in `tree-dump.txt` for the element containing response text and update
 
 ## Verbosity
 
-Long bullet lists can get exhausting to listen to. Three verbosity levels control how Claude responds — not just how audio is filtered, but how Claude generates its response.
+Long responses are expensive — both in TTS API credits and listening time. Four verbosity levels control how Claude generates its response, using progressively stronger compression.
 
 ```
-/voice verbosity low
-/voice verbosity medium
-/voice verbosity high
+/voice verbosity 1
+/voice verbosity 2
+/voice verbosity 3
+/voice verbosity 4
 ```
 
-| Level | Behavior |
-|---|---|
-| `low` (default) | Claude summarizes lists in prose. Max 2 bullet points spoken. |
-| `medium` | Claude limits lists to 5 items and summarizes the rest. |
-| `high` | No constraints — Claude responds however it wants. |
+| Level | Style | Behavior |
+|---|---|---|
+| `1` | Ultra compressed | Abbreviations, arrows for causality (X→Y), one word when one word enough. No bullets. Max 2 sentences. |
+| `2` (default) | Compressed | Drop articles, fragments OK. Max 3 bullets; extras noted as "...and N more". Max 4 sentences. |
+| `3` | Tight | Full sentences, no filler or hedging. Professional but concise. |
+| `4` | No constraints | Claude responds however it wants. |
 
-Takes effect immediately in the current conversation. No new session needed.
+All levels drop pleasantries, filler words, and hedging. Takes effect immediately. No new session needed.
 
 ### Verbosity in Claude Desktop
 
-Claude Desktop has no slash commands, but it does have an MCP prompt picker. After running `setup.py` and restarting Claude Desktop, three prompts appear in the prompt picker:
+Claude Desktop has no slash commands, but it does have an MCP prompt picker. After running `setup.py` and restarting Claude Desktop, four prompts appear in the prompt picker:
 
-- **Voice: Low verbosity**
-- **Voice: Medium verbosity**
-- **Voice: High verbosity**
+- **Voice: Level 1**
+- **Voice: Level 2**
+- **Voice: Level 3**
+- **Voice: Level 4**
 
 Select one at the start of a conversation and it injects the same directive that `/voice verbosity` would in Claude Code.
 
@@ -260,6 +268,12 @@ claude-voice/
 ├── tests/
 └── setup.py
 ```
+
+---
+
+## Credits
+
+Verbosity compression levels inspired by [Julius Brussee's Caveman](https://github.com/JuliusBrussee/caveman/) — shamelessly stolen and adapted for voice.
 
 ---
 

@@ -9,12 +9,12 @@ _LIST_ITEM = re.compile(r"^(\s*(?:[-*]|\d+\.)\s+.+)$", re.MULTILINE)
 _SENTENCE_SPLIT = re.compile(r"(?<=[.!?])\s+")
 
 def _apply_verbosity(text: str, verbosity: str) -> str:
-    if verbosity not in ("low", "medium", "high"):
-        raise ValueError(f"Invalid verbosity: {verbosity!r}. Use low, medium, or high.")
-    if verbosity == "high":
+    if verbosity not in ("1", "2", "3", "4"):
+        raise ValueError(f"Invalid verbosity: {verbosity!r}. Use 1, 2, 3, or 4.")
+    if verbosity in ("3", "4"):
         return text
 
-    limit = 0 if verbosity == "low" else 3  # low=0 bullets, medium=3
+    limit = 0 if verbosity == "1" else 3  # 1=0 bullets, 2=3 bullets
 
     lines = text.splitlines(keepends=True)
     result = []
@@ -23,7 +23,7 @@ def _apply_verbosity(text: str, verbosity: str) -> str:
 
     def flush_list():
         total = len(list_items)
-        if verbosity == "low":
+        if verbosity == "1":
             result.append(f"The response included a list of {total} item{'s' if total != 1 else ''}.\n")
             return
         kept = list_items[:limit]
@@ -49,7 +49,7 @@ def _apply_verbosity(text: str, verbosity: str) -> str:
     return "".join(result)
 
 
-def filter_response(text: str, verbosity: str = "low") -> str:
+def filter_response(text: str, verbosity: str = "2") -> str:
     if not isinstance(text, str):
         return ""
     # Normalize Windows line endings
@@ -66,7 +66,7 @@ def filter_response(text: str, verbosity: str = "low") -> str:
     return text.strip()
 
 
-def extract_prose_sentences(text: str, verbosity: str = "low") -> list[str]:
+def extract_prose_sentences(text: str, verbosity: str = "2") -> list[str]:
     filtered = filter_response(text, verbosity=verbosity)
     parts = _SENTENCE_SPLIT.split(filtered)
     return [s.strip() for s in parts if len(s.split()) >= 4]

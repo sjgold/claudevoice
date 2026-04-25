@@ -18,14 +18,14 @@ def test_load_returns_defaults_when_no_file(tmp_path):
     assert cfg["openai_model"] == "tts-1"
     assert cfg["google_api_key"] == ""
     assert cfg["google_voice"] == "en-US-Neural2-C"
-    assert cfg["verbosity"] == "low"
+    assert cfg["verbosity"] == "2"
 
 
 def test_save_and_load_roundtrip(tmp_path):
     config_path = tmp_path / "voice-config.json"
     with patch("src.config.CONFIG_PATH", config_path):
         from src import config
-        config.save({"enabled": True, "provider": "openai", "voice_id": "abc123", "elevenlabs_api_key": "sk-test", "openai_api_key": "sk-oai", "openai_voice": "nova", "openai_model": "tts-1", "google_api_key": "", "google_voice": "en-US-Neural2-C", "verbosity": "low"})
+        config.save({"enabled": True, "provider": "openai", "voice_id": "abc123", "elevenlabs_api_key": "sk-test", "openai_api_key": "sk-oai", "openai_voice": "nova", "openai_model": "tts-1", "google_api_key": "", "google_voice": "en-US-Neural2-C", "verbosity": "2"})
         cfg = config.load()
     assert cfg["enabled"] is True
     assert cfg["provider"] == "openai"
@@ -42,21 +42,21 @@ def test_set_enabled_persists(tmp_path):
         assert config.is_enabled() is False
 
 
-def test_verbosity_defaults_to_low(tmp_path):
+def test_verbosity_defaults_to_2(tmp_path):
     config_path = tmp_path / "voice-config.json"
     with patch("src.config.CONFIG_PATH", config_path):
         from src import config
         cfg = config.load()
-    assert cfg["verbosity"] == "low"
+    assert cfg["verbosity"] == "2"
 
 
 def test_set_verbosity_persists(tmp_path):
     config_path = tmp_path / "voice-config.json"
     with patch("src.config.CONFIG_PATH", config_path):
         from src import config
-        config.set_verbosity("medium")
+        config.set_verbosity("2")
         cfg = config.load()
-    assert cfg["verbosity"] == "medium"
+    assert cfg["verbosity"] == "2"
 
 
 def test_set_voice_persists_across_reload(tmp_path):

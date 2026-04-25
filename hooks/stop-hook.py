@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src import filter as f, tts
+from src import config, filter as f, tts
 
 
 def main():
@@ -17,13 +17,11 @@ def main():
     raw_text = data.get("last_assistant_message", "")
     if not raw_text:
         return
-    filtered = f.filter_response(raw_text)
+    cfg = config.load()
+    verbosity = cfg.get("verbosity", "2")
+    filtered = f.filter_response(raw_text, verbosity=verbosity)
     tts.speak(filtered)
     tts._audio_queue.join()
-
-
-if __name__ == "__main__":
-    main()
 
 
 if __name__ == "__main__":

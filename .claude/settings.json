@@ -45,8 +45,20 @@
       "Bash(python \"C:/Users/SJG/Documents/CodePlayground/claude voice/commands/voice_verbosity.py\" \"high\")",
       "Bash(python \"C:/Users/SJG/Documents/CodePlayground/claude voice/commands/voice_provider.py\" \"elevenlabs\")",
       "Bash(python \"C:/Users/SJG/Documents/CodePlayground/claude voice/commands/voice_provider.py\" \"openai\")",
-      "mcp__plugin_context-mode_context-mode__ctx_fetch_and_index"
+      "mcp__plugin_context-mode_context-mode__ctx_fetch_and_index",
+      "Bash(python \"C:/Users/SJG/Documents/CodePlayground/claude voice/commands/voice_verbosity.py\" \"1\")",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(python *)",
+      "Edit(*)",
+      "Edit(**)",
+      "Write(*)",
+      "Write(**)",
+      "Edit(/.claude/skills/voice-caveman/**)",
+      "Bash(grep -E \"AIza[0-9A-Za-z_-]{20,}|sk-[0-9A-Za-z_-]{20,}|sk_[0-9a-f]{40,}\")",
+      "Bash(git rm *)"
     ],
+    "defaultMode": "acceptEdits",
     "additionalDirectories": [
       "C:\\Users\\SJG\\AppData\\Local\\Temp",
       "C:\\Users\\SJG\\Documents\\CodePlayground\\claude voice\\.claude\\commands",

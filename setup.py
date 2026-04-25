@@ -9,6 +9,7 @@ from pathlib import Path
 import requests
 
 HOOK_SCRIPT = Path(__file__).parent / "hooks" / "stop-hook.py"
+VERBOSITY_HOOK_SCRIPT = Path(__file__).parent / "hooks" / "verbosity-hook.py"
 SETTINGS_PATH = Path.home() / ".claude" / "settings.json"
 OPENAI_VOICES = ["alloy", "echo", "fable", "nova", "onyx", "shimmer"]
 
@@ -55,6 +56,35 @@ def verify_google_key(api_key: str) -> list[dict] | None:
         return None
     except Exception:
         return None
+
+
+def register_verbosity_hook(hook_command: str) -> None:
+    settings = {}
+    if SETTINGS_PATH.exists():
+        try:
+            with open(SETTINGS_PATH) as f:
+                settings = json.load(f)
+        except (json.JSONDecodeError, ValueError):
+            settings = {}
+
+    hooks = settings.setdefault("hooks", {})
+    submit_hooks = hooks.get("UserPromptSubmit", [])
+
+    existing = next((h for h in submit_hooks if not h.get("matcher")), None)
+    if existing:
+        existing_cmds = existing.setdefault("hooks", [])
+        existing_cmds = [c for c in existing_cmds if "verbosity-hook.py" not in str(c.get("command", ""))]
+        existing_cmds.append({"type": "command", "command": hook_command})
+        existing["hooks"] = existing_cmds
+    else:
+        submit_hooks.append({"hooks": [{"type": "command", "command": hook_command}]})
+
+    hooks["UserPromptSubmit"] = submit_hooks
+    settings["hooks"] = hooks
+
+    SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(SETTINGS_PATH, "w") as f:
+        json.dump(settings, f, indent=2)
 
 
 def register_hook(hook_command: str) -> None:
@@ -247,6 +277,10 @@ def main():
     hook_cmd = f'python "{HOOK_SCRIPT.resolve()}"'
     register_hook(hook_cmd)
     print(f"✓ Stop hook registered in {SETTINGS_PATH}")
+
+    verbosity_hook_cmd = f'python "{VERBOSITY_HOOK_SCRIPT.resolve()}"'
+    register_verbosity_hook(verbosity_hook_cmd)
+    print(f"✓ Verbosity hook registered in {SETTINGS_PATH}")
 
     register_mcp_server()
 

@@ -61,14 +61,14 @@ def test_extract_sentences_handles_question_and_exclamation():
 
 def test_low_verbosity_replaces_list_with_summary():
     text = "Here are the steps:\n- First do this\n- Then do that\n- Also this\n- And this too\n- Finally this"
-    result = filter_response(text, verbosity="low")
+    result = filter_response(text, verbosity="1")
     assert "First do this" not in result
     assert "The response included a list of 5 items." in result
 
 
 def test_low_verbosity_replaces_short_list_too():
     text = "Two options:\n- Option A\n- Option B"
-    result = filter_response(text, verbosity="low")
+    result = filter_response(text, verbosity="1")
     assert "Option A" not in result
     assert "The response included a list of 2 items." in result
 
@@ -76,7 +76,7 @@ def test_low_verbosity_replaces_short_list_too():
 def test_medium_verbosity_keeps_three_bullets():
     items = "\n".join(f"- Item {i}" for i in range(1, 7))
     text = f"The list:\n{items}"
-    result = filter_response(text, verbosity="medium")
+    result = filter_response(text, verbosity="2")
     assert "Item 1" in result
     assert "Item 3" in result
     assert "Item 4" not in result
@@ -86,7 +86,7 @@ def test_medium_verbosity_keeps_three_bullets():
 def test_high_verbosity_reads_all_bullets():
     items = "\n".join(f"- Item {i}" for i in range(1, 9))
     text = f"Full list:\n{items}"
-    result = filter_response(text, verbosity="high")
+    result = filter_response(text, verbosity="3")
     assert "Item 8" in result
 
 
@@ -112,7 +112,7 @@ def test_filter_response_handles_none_input():
 
 def test_filter_response_normalizes_windows_line_endings():
     text = "Hello world.\r\n- Item one\r\n- Item two\r\nDone."
-    result = filter_response(text, verbosity="high")
+    result = filter_response(text, verbosity="3")
     assert "\r" not in result
 
 
