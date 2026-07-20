@@ -1,18 +1,41 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node \"C:/Users/SJG/.claude/plugins/cache/openai-codex/codex/1.0.3/scripts/codex-companion.mjs\" status)",
-      "WebSearch",
+      "Bash(python *)",
+      "Bash(python -m pytest *)",
+      "Bash(pip install *)",
+      "Bash(ffplay -version)",
+      "Bash(echo *)",
       "Bash(cat)",
-      "Read(//c/c/Users/SJG/Documents/CodePlayground/claude voice/**)",
+      "Bash(git add *)",
+      "Bash(git commit -m *)",
+      "Bash(git checkout *)",
       "Bash(mkdir -p src tests hooks commands daemon mcp_server)",
       "Bash(touch src/__init__.py tests/__init__.py hooks/__init__.py commands/__init__.py daemon/__init__.py mcp_server/__init__.py)",
+      "Bash(node \"C:/Users/SJG/.claude/plugins/cache/openai-codex/codex/1.0.3/scripts/codex-companion.mjs\" status)",
+      "Edit(*)",
+      "Edit(**)",
+      "Write(*)",
+      "Write(**)",
+      "Read(//c/Users/SJG/.claude/**)",
+      "Read(//c/Users/SJG/**)",
+      "Read(//c/c/Users/SJG/Documents/CodePlayground/claude voice/**)",
+      "PowerShell(*)",
+      "WebSearch",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "mcp__plugin_context-mode_context-mode__ctx_search",
+      "mcp__plugin_context-mode_context-mode__ctx_execute",
       "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
-      "Bash(python -m pytest tests/ -v)",
-      "Bash(python -m pytest tests/test_config.py -v)",
-      "Bash(pip install *)",
-      "Bash(python -m pytest tests/test_filter.py -v)",
-      "Bash(python -m pytest tests/test_filter.py::test_unclosed_code_fence_does_not_leak tests/test_filter.py::test_unclosed_code_fence_preserves_following_prose -v)"
+      "mcp__plugin_context-mode_context-mode__ctx_fetch_and_index",
+      "mcp__proxima__pro_search",
+      "mcp__proxima__ask_chatgpt",
+      "mcp__proxima__ask_gemini",
+      "Bash(xargs wc *)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\SJG\\AppData\\Local\\Temp",
+      "C:\\Users\\SJG\\.claude"
     ]
   }
 }

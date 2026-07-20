@@ -8,3 +8,4 @@ build/
 .env
 .claude/settings.local.json
 CLAUDE.md
+.venv/
